@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "name": "Response Instructions + Write For Me",
+  "identifier": "response_instructions",
+  "author": "bumyann",
+  "github": "https://github.com/bumyann/lumiverse-response-instructions",
+  "homepage": "https://github.com/bumyann/lumiverse-response-instructions",
+  "permissions": ["interceptor", "generation", "storage"],
+  "entry_backend": "dist/backend.js",
+  "entry_frontend": "dist/frontend.js",
+  "interceptorTimeoutMs": 5000
+}
