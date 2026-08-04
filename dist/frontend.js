@@ -102,11 +102,11 @@ export function setup(ctx) {
       z-index: 9997;
       background: var(--lumiverse-bg, #1a1a2e);
       border: 1px solid var(--lumiverse-border, rgba(255,255,255,0.12));
-      border-radius: 10px 10px 0 0;
+      border-radius: 0 0 10px 10px;
       box-shadow: 0 -4px 24px rgba(0,0,0,0.35);
       display: flex;
       flex-direction: column;
-      transform: translateY(100%);
+      transform: translateY(-100%);
       transition: transform 0.2s cubic-bezier(0.4,0,0.2,1);
       font-size: 13px;
       color: var(--lumiverse-text, #e0e0f0);
@@ -358,10 +358,12 @@ export function setup(ctx) {
     const bar = findChatBar();
     if (bar) {
       const rect = bar.getBoundingClientRect();
-      panel.style.bottom = (window.innerHeight - rect.top) + 'px';
+      panel.style.top    = rect.bottom + 'px';
+      panel.style.bottom = '';
       panel.style.left   = rect.left + 'px';
       panel.style.right  = (window.innerWidth - rect.right) + 'px';
     } else {
+      panel.style.top    = '';
       panel.style.bottom = '60px';
       panel.style.left   = '0';
       panel.style.right  = '0';
