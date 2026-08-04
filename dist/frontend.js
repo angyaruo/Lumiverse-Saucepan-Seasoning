@@ -229,7 +229,7 @@ export function setup(ctx) {
     strip.style.left   = rect.left + 'px';
     strip.style.right  = (window.innerWidth - rect.right) + 'px';
     strip.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
-    strip.style.zIndex = '100';
+    strip.style.zIndex = '9991'; // drawer is 9992, strip sits just below it
   }
 
   function updateParentPadding() {
