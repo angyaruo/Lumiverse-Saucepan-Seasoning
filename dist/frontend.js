@@ -100,19 +100,24 @@ export function setup(ctx) {
     #ri-panel-wrap {
       position: fixed;
       z-index: 9997;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 300px;
+      max-width: 85vw;
       background: var(--lumiverse-bg, #1a1a2e);
-      border: 1px solid var(--lumiverse-border, rgba(255,255,255,0.12));
-      border-radius: 0 0 10px 10px;
-      box-shadow: 0 -4px 24px rgba(0,0,0,0.35);
+      border-right: 1px solid var(--lumiverse-border, rgba(255,255,255,0.14));
+      box-shadow: 4px 0 24px rgba(0,0,0,0.45);
       display: flex;
       flex-direction: column;
-      transform: translateY(-100%);
-      transition: transform 0.2s cubic-bezier(0.4,0,0.2,1);
+      transform: translateX(-100%);
+      transition: transform 0.22s cubic-bezier(0.4,0,0.2,1);
       font-size: 13px;
       color: var(--lumiverse-text, #e0e0f0);
       font-family: inherit;
+      overflow: hidden;
     }
-    #ri-panel-wrap.open { transform: translateY(0); }
+    #ri-panel-wrap.open { transform: translateX(0); }
 
     /* inner tabs */
     #ri-inner-tabs {
@@ -140,7 +145,10 @@ export function setup(ctx) {
     .ri-on-dot.on { display: block; }
 
     /* sub-panels */
-    .ri-sub-panel { display: none; flex-direction: column; gap: 8px; padding: 10px 12px; }
+    .ri-sub-panel {
+      display: none; flex-direction: column; gap: 8px; padding: 10px 12px;
+      overflow-y: auto; flex: 1;
+    }
     .ri-sub-panel.active { display: flex; }
 
     .ri-toolbar { display: flex; align-items: center; gap: 6px; }
@@ -355,19 +363,7 @@ export function setup(ctx) {
   }
 
   function positionPanel() {
-    const bar = findChatBar();
-    if (bar) {
-      const rect = bar.getBoundingClientRect();
-      panel.style.top    = rect.bottom + 'px';
-      panel.style.bottom = '';
-      panel.style.left   = rect.left + 'px';
-      panel.style.right  = (window.innerWidth - rect.right) + 'px';
-    } else {
-      panel.style.top    = '';
-      panel.style.bottom = '60px';
-      panel.style.left   = '0';
-      panel.style.right  = '0';
-    }
+    // panel is CSS-positioned (left sidebar), no dynamic positioning needed
   }
 
   window.addEventListener('resize', () => {
@@ -375,16 +371,7 @@ export function setup(ctx) {
     if (btnSettings.x == null) applyBtnSettings();
   });
 
-  // reposition panel when textarea grows (multiline input)
-  const inputAreaEl = document.querySelector('[data-component="InputArea"]');
-  let resizeObserver = null;
-  if (inputAreaEl && typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      positionPanel();
-      if (btnSettings.x == null) applyBtnSettings();
-    });
-    resizeObserver.observe(inputAreaEl);
-  }
+  let resizeObserver = null; // kept for cleanup compatibility
 
   // ─── Drag ────────────────────────────────────────────────────────────────────
 
@@ -433,6 +420,10 @@ export function setup(ctx) {
         Instructions
       </button>
       <button class="ri-inner-tab" data-tab="wfm">Write For Me</button>
+      <button id="ri-panel-close" title="Close" style="
+        background:none;border:none;color:var(--lumiverse-text-dim,rgba(255,255,255,0.4));
+        cursor:pointer;font-size:16px;padding:0 10px;flex-shrink:0;transition:color 0.12s;
+      ">✕</button>
     </div>
 
     <div class="ri-sub-panel active" id="ri-sub-ri">
@@ -468,7 +459,12 @@ export function setup(ctx) {
     </div>
   `;
   document.body.appendChild(panel);
-  positionPanel();
+
+  panel.querySelector('#ri-panel-close').addEventListener('click', () => {
+    panelOpen = false;
+    panel.classList.remove('open');
+    btn.classList.remove('panel-open');
+  });
 
   function togglePanel() {
     panelOpen = !panelOpen;
