@@ -1,36 +1,27 @@
-// Response Instructions + Write For Me — Lumiverse Spindle Backend
-// Handles: prompt interceptor injection, Write For Me generation, preset persistence
-//
-// Ported from bumyann/sillytavern-response-instructions
-// ST used /inject (STscript) at Author's Note depth. Spindle equivalent: registerInterceptor.
+// Response Instructions + Write For Me — Lumiverse Spindle Backend v2.0
+// storage is free-tier — no permission needed
+// interceptor + generation permissions declared in spindle.json
 
 declare const spindle;
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-let activeInstruction = '';      // current instruction text
-let instructionEnabled = false;  // toggle
+let activeInstruction = '';
+let instructionEnabled = false;
 
 // ─── Interceptor ─────────────────────────────────────────────────────────────
-// Injects the active instruction as a system message just before the LLM call.
-// Priority 10 = runs early (low number = first), so it's near the top of context.
 
-spindle.registerInterceptor(async (messages, context) => {
-  if (!instructionEnabled || !activeInstruction.trim()) {
-    return messages;
-  }
+spindle.registerInterceptor(async (messages) => {
+  if (!instructionEnabled || !activeInstruction.trim()) return messages;
 
   const injected = {
     role: 'system',
     content: `[Response Instructions]\n${activeInstruction.trim()}`,
   };
 
-  // Inject just before the last user message for maximum influence,
-  // mirroring ST's Author's Note depth behaviour.
+  // Insert just before the last user message — mirrors ST Author's Note depth
   const lastUserIdx = [...messages].reverse().findIndex(m => m.role === 'user');
-  const insertAt = lastUserIdx === -1
-    ? messages.length
-    : messages.length - lastUserIdx;
+  const insertAt = lastUserIdx === -1 ? messages.length : messages.length - lastUserIdx;
 
   const result = [...messages];
   result.splice(insertAt, 0, injected);
@@ -45,76 +36,63 @@ spindle.registerInterceptor(async (messages, context) => {
 
 spindle.onFrontendMessage(async (payload, userId) => {
 
-  // ── Instruction state sync (frontend → backend) ──
-  if (payload.type === 'set_instruction') {
+  // Instruction state sync
+  if (payload.type === 'ri:set') {
     activeInstruction = payload.text ?? '';
     instructionEnabled = payload.enabled ?? false;
     return;
   }
 
-  // ── Preset: save ──
-  if (payload.type === 'save_preset') {
+  // Preset: save
+  if (payload.type === 'preset:save') {
     const { store, name, text } = payload;
-    // store = 'ri' | 'wfm'
-    const key = `presets_${store}.json`;
-    const existing = await spindle.storage.getJson(key, { fallback: {} });
-    existing[name] = text;
-    await spindle.storage.setJson(key, existing, { indent: 2 });
-    spindle.sendToFrontend({ type: 'preset_saved', store, name }, userId);
-    return;
-  }
-
-  // ── Preset: delete ──
-  if (payload.type === 'delete_preset') {
-    const { store, name } = payload;
-    const key = `presets_${store}.json`;
-    const existing = await spindle.storage.getJson(key, { fallback: {} });
-    delete existing[name];
-    await spindle.storage.setJson(key, existing, { indent: 2 });
-    spindle.sendToFrontend({ type: 'preset_deleted', store, name }, userId);
-    return;
-  }
-
-  // ── Preset: load all ──
-  if (payload.type === 'load_presets') {
-    const { store } = payload;
     const key = `presets_${store}.json`;
     const data = await spindle.storage.getJson(key, { fallback: {} });
-    spindle.sendToFrontend({ type: 'presets_loaded', store, data }, userId);
+    data[name] = text;
+    await spindle.storage.setJson(key, data);
+    spindle.sendToFrontend({ type: 'preset:saved', store, name }, userId);
     return;
   }
 
-  // ── Write For Me: generate ──
-  if (payload.type === 'generate_wfm') {
-    const { instruction, chatContext, requestId } = payload;
+  // Preset: delete
+  if (payload.type === 'preset:delete') {
+    const { store, name } = payload;
+    const key = `presets_${store}.json`;
+    const data = await spindle.storage.getJson(key, { fallback: {} });
+    delete data[name];
+    await spindle.storage.setJson(key, data);
+    spindle.sendToFrontend({ type: 'preset:deleted', store, name }, userId);
+    return;
+  }
 
-    const systemPrompt = `You are a creative writing assistant helping the user draft their next message in an ongoing roleplay or chat.
-${instruction ? `The user's instruction: ${instruction}` : ''}
-Write ONLY the user's message — no narration, no quotes around it, no preamble. Write naturally in first person unless the context clearly calls for otherwise. Match the tone and style of the conversation.`;
+  // Preset: load
+  if (payload.type === 'preset:load') {
+    const key = `presets_${payload.store}.json`;
+    const data = await spindle.storage.getJson(key, { fallback: {} });
+    spindle.sendToFrontend({ type: 'preset:data', store: payload.store, data }, userId);
+    return;
+  }
+
+  // Write For Me: generate
+  if (payload.type === 'wfm:generate') {
+    const { instruction, requestId } = payload;
+
+    const sys = `You are a creative writing assistant helping the user draft their next message in a roleplay.${instruction ? `\nUser's direction: ${instruction}` : ''}
+Write ONLY the message — no preamble, no quotes around it, first person unless context says otherwise. Match the conversation's tone.`;
 
     try {
       const result = await spindle.generate.quiet({
         messages: [
-          { role: 'system', content: systemPrompt },
-          ...(chatContext ?? []),
+          { role: 'system', content: sys },
           { role: 'user', content: 'Write my next message.' },
         ],
       });
-
-      spindle.sendToFrontend({
-        type: 'wfm_result',
-        requestId,
-        text: result.content.trim(),
-      }, userId);
+      spindle.sendToFrontend({ type: 'wfm:result', requestId, text: result.content.trim() }, userId);
     } catch (err) {
-      spindle.sendToFrontend({
-        type: 'wfm_error',
-        requestId,
-        error: err?.message ?? 'Generation failed',
-      }, userId);
+      spindle.sendToFrontend({ type: 'wfm:error', requestId, error: err?.message ?? 'Generation failed' }, userId);
     }
     return;
   }
 });
 
-spindle.log.info('[Response Instructions] backend loaded');
+spindle.log.info('[RI] backend v2 loaded');
