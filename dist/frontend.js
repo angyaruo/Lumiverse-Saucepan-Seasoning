@@ -100,9 +100,9 @@ export function setup(ctx) {
     #ri-panel-wrap {
       position: fixed;
       z-index: 9997;
-      left: 0; right: 0;
       background: var(--lumiverse-bg, #1a1a2e);
-      border-top: 1px solid var(--lumiverse-border, rgba(255,255,255,0.12));
+      border: 1px solid var(--lumiverse-border, rgba(255,255,255,0.12));
+      border-radius: 10px 10px 0 0;
       box-shadow: 0 -4px 24px rgba(0,0,0,0.35);
       display: flex;
       flex-direction: column;
@@ -359,8 +359,12 @@ export function setup(ctx) {
     if (bar) {
       const rect = bar.getBoundingClientRect();
       panel.style.bottom = (window.innerHeight - rect.top) + 'px';
+      panel.style.left   = rect.left + 'px';
+      panel.style.right  = (window.innerWidth - rect.right) + 'px';
     } else {
       panel.style.bottom = '60px';
+      panel.style.left   = '0';
+      panel.style.right  = '0';
     }
   }
 
