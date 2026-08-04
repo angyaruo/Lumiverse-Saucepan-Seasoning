@@ -335,8 +335,8 @@ export function setup(ctx) {
       // default: above chat bar, left side
       const bar = findChatBar();
       const barBottom = bar
-        ? (window.innerHeight - bar.getBoundingClientRect().top) + 10
-        : 70;
+        ? (window.innerHeight - bar.getBoundingClientRect().top) + 8
+        : 130;
       btn.style.bottom = barBottom + 'px';
       btn.style.left   = '12px';
       btn.style.top    = ''; btn.style.right = '';
@@ -345,14 +345,11 @@ export function setup(ctx) {
   applyBtnSettings();
 
   function findChatBar() {
-    // Lumiverse uses CSS module classes like _inputRow_pcxwe_604
-    // match by partial class name prefix, fall back to textarea parent
+    // data-component="InputArea" is stable — not a CSS module hash
     return (
-      document.querySelector('[class*="_inputRow_"]') ||
-      document.querySelector('[class*="_inputBar_"]') ||
-      document.querySelector('[class*="_chatInput_"]') ||
-      document.querySelector('textarea[name="chat-message"]')?.closest('[class]') ||
-      document.querySelector('textarea[aria-label="Message"]')?.closest('div') ||
+      document.querySelector('[data-component="InputArea"]') ||
+      document.querySelector('[class*="_container_"][class*="_pcxwe_"]') ||
+      document.querySelector('textarea[name="chat-message"]')?.closest('[data-component]') ||
       null
     );
   }
@@ -361,7 +358,6 @@ export function setup(ctx) {
     const bar = findChatBar();
     if (bar) {
       const rect = bar.getBoundingClientRect();
-      // sit flush above the input row
       panel.style.bottom = (window.innerHeight - rect.top) + 'px';
     } else {
       panel.style.bottom = '60px';
@@ -370,8 +366,19 @@ export function setup(ctx) {
 
   window.addEventListener('resize', () => {
     positionPanel();
-    if (btnSettings.x == null) applyBtnSettings(); // re-snap default pos on resize
+    if (btnSettings.x == null) applyBtnSettings();
   });
+
+  // reposition panel when textarea grows (multiline input)
+  const inputAreaEl = document.querySelector('[data-component="InputArea"]');
+  let resizeObserver = null;
+  if (inputAreaEl && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => {
+      positionPanel();
+      if (btnSettings.x == null) applyBtnSettings();
+    });
+    resizeObserver.observe(inputAreaEl);
+  }
 
   // ─── Drag ────────────────────────────────────────────────────────────────────
 
@@ -747,6 +754,7 @@ export function setup(ctx) {
 
   return () => {
     unsubBackend();
+    resizeObserver?.disconnect();
     btn.remove(); panel.remove(); customPopup.remove(); styleEl.remove();
     window.removeEventListener('resize', positionPanel);
   };
