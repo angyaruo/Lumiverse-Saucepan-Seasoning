@@ -64,7 +64,6 @@ The UI mounts as a collapsible **bottom dock panel** (since Lumiverse doesn't ha
 |-------------|--------------------------------------------------|
 | `interceptor` | Inject instruction into pre-LLM message array |
 | `generation`  | Write For Me AI drafting                       |
-| `storage`     | Persist presets between sessions               |
 
 ---
 
