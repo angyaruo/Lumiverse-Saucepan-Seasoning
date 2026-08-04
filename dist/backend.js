@@ -1,8 +1,7 @@
 // Response Instructions + Write For Me — Lumiverse Spindle Backend v2.0
 // storage is free-tier — no permission needed
 // interceptor + generation permissions declared in spindle.json
-
-declare const spindle;
+// spindle is a global provided by the Spindle runtime — no import needed
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
