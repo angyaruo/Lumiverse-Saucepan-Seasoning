@@ -334,8 +334,10 @@ export function setup(ctx) {
     } else {
       // default: above chat bar, left side
       const bar = findChatBar();
-      const barH = bar ? bar.getBoundingClientRect().height : 56;
-      btn.style.bottom = (barH + 10) + 'px';
+      const barBottom = bar
+        ? (window.innerHeight - bar.getBoundingClientRect().top) + 10
+        : 70;
+      btn.style.bottom = barBottom + 'px';
       btn.style.left   = '12px';
       btn.style.top    = ''; btn.style.right = '';
     }
@@ -343,17 +345,27 @@ export function setup(ctx) {
   applyBtnSettings();
 
   function findChatBar() {
-    return document.querySelector(
-      '.lumi-input-bar, .chat-input-bar, [data-testid="chat-input-bar"], ' +
-      '[data-testid="chat-input"], .input-bar, footer.chat-footer, ' +
-      '.message-input-wrapper, .chat-footer'
+    // Lumiverse uses CSS module classes like _inputRow_pcxwe_604
+    // match by partial class name prefix, fall back to textarea parent
+    return (
+      document.querySelector('[class*="_inputRow_"]') ||
+      document.querySelector('[class*="_inputBar_"]') ||
+      document.querySelector('[class*="_chatInput_"]') ||
+      document.querySelector('textarea[name="chat-message"]')?.closest('[class]') ||
+      document.querySelector('textarea[aria-label="Message"]')?.closest('div') ||
+      null
     );
   }
 
   function positionPanel() {
     const bar = findChatBar();
-    const barH = bar ? bar.getBoundingClientRect().height : 56;
-    panel.style.bottom = barH + 'px';
+    if (bar) {
+      const rect = bar.getBoundingClientRect();
+      // sit flush above the input row
+      panel.style.bottom = (window.innerHeight - rect.top) + 'px';
+    } else {
+      panel.style.bottom = '60px';
+    }
   }
 
   window.addEventListener('resize', () => {
@@ -650,7 +662,8 @@ export function setup(ctx) {
     const text = wfmDraft.value.trim();
     if (!text) return;
     const inp = document.querySelector(
-      '[data-testid="chat-input"] textarea, textarea.chat-input, #chat-input textarea, .lumi-chat-input textarea, .message-input textarea'
+      'textarea[name="chat-message"], textarea[aria-label="Message"], ' +
+      '[data-testid="chat-input"] textarea, textarea.chat-input, #chat-input textarea'
     );
     if (inp) { inp.value = text; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.focus(); }
     else { navigator.clipboard?.writeText(text).catch(() => {}); }
