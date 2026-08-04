@@ -23,8 +23,9 @@ export function setup(ctx) {
   styleEl.textContent = `
     #ri-strip {
       display: none; flex-direction: column;
-      background: var(--lumiverse-bg, #1a1a2e);
+      background: var(--lumiverse-surface, var(--lumiverse-bg, #1a1a2e));
       border-top: 1px solid var(--lumiverse-border, rgba(255,255,255,0.1));
+      border-bottom: 1px solid var(--lumiverse-border, rgba(255,255,255,0.1));
       font-size: 13px; color: var(--lumiverse-text, #e0e0f0); font-family: inherit;
     }
     #ri-strip.open { display: flex; }
@@ -70,7 +71,7 @@ export function setup(ctx) {
     .ri-textarea {
       width:100%; min-height:64px; max-height:160px; resize:vertical; padding:8px 10px; border-radius:8px;
       border:1px solid var(--lumiverse-border,rgba(255,255,255,0.1));
-      background:var(--lumiverse-fill,rgba(255,255,255,0.05));
+      background:var(--lumiverse-fill,rgba(255,255,255,0.06));
       color:var(--lumiverse-text,#e0e0f0); font-size:13px; font-family:inherit;
       outline:none; box-sizing:border-box; transition:border-color 0.12s;
     }
@@ -98,8 +99,9 @@ export function setup(ctx) {
       border:2.5px solid color-mix(in srgb,var(--ri-btn-bg,var(--lumiverse-accent,#6c63ff)) 55%,white);
       box-shadow:0 3px 14px rgba(0,0,0,0.4); cursor:pointer; display:flex; align-items:center;
       justify-content:center; color:#fff; font-size:20px; user-select:none; touch-action:none;
-      overflow:hidden; transition:box-shadow 0.15s,transform 0.12s;
+      overflow:visible; transition:box-shadow 0.15s,transform 0.12s;
     }
+    #ri-float-btn img.ri-btn-img { border-radius:50%; }
     #ri-float-btn:hover { transform:scale(1.06); }
     #ri-float-btn.active {
       box-shadow:0 3px 14px rgba(0,0,0,0.4),0 0 0 3px color-mix(in srgb,var(--ri-btn-bg,var(--lumiverse-accent,#6c63ff)) 40%,transparent);
@@ -110,14 +112,15 @@ export function setup(ctx) {
       object-fit:cover; border-radius:50%; pointer-events:none;
     }
     #ri-float-btn .ri-btn-dot {
-      position:absolute; top:2px; right:2px; width:9px; height:9px;
-      border-radius:50%; background:#4caf50; border:2px solid #111; display:none; z-index:2;
+      position:absolute; top:-2px; right:-2px; width:10px; height:10px;
+      border-radius:50%; background:#4caf50; border:2px solid var(--lumiverse-bg,#111);
+      display:none; z-index:2;
     }
     #ri-float-btn .ri-btn-dot.on { display:block; }
 
     #ri-custom-popup {
       position:fixed; z-index:10000;
-      background:var(--lumiverse-bg,#1a1a2e);
+      background:var(--lumiverse-surface,var(--lumiverse-bg,#1a1a2e));
       border:1px solid var(--lumiverse-border,rgba(255,255,255,0.14));
       border-radius:10px; box-shadow:0 8px 28px rgba(0,0,0,0.5);
       padding:12px; display:none; flex-direction:column; gap:10px;
@@ -226,7 +229,7 @@ export function setup(ctx) {
     strip.style.left   = rect.left + 'px';
     strip.style.right  = (window.innerWidth - rect.right) + 'px';
     strip.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
-    strip.style.zIndex = '9997';
+    strip.style.zIndex = '100';
   }
 
   function updateParentPadding() {
@@ -326,7 +329,7 @@ export function setup(ctx) {
   btn.addEventListener('touchmove', ()=>{ if(lpTimer){clearTimeout(lpTimer);lpTimer=null;} });
 
   document.addEventListener('pointerdown', e => {
-    if (panelOpen&&!strip.contains(e.target)&&!btn.contains(e.target)) { panelOpen=false; strip.classList.remove('open'); btn.classList.remove('active'); updateParentPadding(); }
+    // panel stays open until explicitly closed via button or ✕
     if (customOpen&&!customPopup.contains(e.target)&&!btn.contains(e.target)) closeCustom();
   }, true);
 
