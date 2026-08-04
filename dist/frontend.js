@@ -208,17 +208,27 @@ export function setup(ctx) {
 
   // InputArea is position:absolute;bottom:8px inside a flex parent.
   // We can't use DOM flow. Instead: fix strip above InputArea via padding-bottom on parent.
-  document.body.appendChild(strip);
+  // Append strip inside _chatColumnInner_ so it shares the chat column's
+  // stacking context — the drawer lives outside this container and will
+  // naturally render on top regardless of z-index.
+  function mountStrip() {
+    if (strip.parentNode) return;
+    const parent = document.querySelector('[data-component="InputArea"]')?.parentElement;
+    if (parent) {
+      parent.appendChild(strip);
+    } else {
+      document.body.appendChild(strip); // fallback
+    }
+  }
+  mountStrip();
+  setTimeout(mountStrip, 800);
+  setTimeout(mountStrip, 2500);
 
   function getInputArea() {
     return document.querySelector('[data-component="InputArea"]');
   }
   function getInputParent() {
     return getInputArea()?.parentElement;
-  }
-
-  function mountStrip() {
-    // no-op: strip is appended to body, positioned via JS below
   }
 
   function positionStrip() {
@@ -229,7 +239,7 @@ export function setup(ctx) {
     strip.style.left   = rect.left + 'px';
     strip.style.right  = (window.innerWidth - rect.right) + 'px';
     strip.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
-    strip.style.zIndex = '9991'; // drawer is 9992, strip sits just below it
+    strip.style.zIndex = '1';
   }
 
   function updateParentPadding() {
@@ -319,7 +329,6 @@ export function setup(ctx) {
     panelOpen=!panelOpen;
     strip.classList.toggle('open',panelOpen); btn.classList.toggle('active',panelOpen);
     positionStrip();
-    // small delay to let strip render before measuring height
     setTimeout(updateParentPadding, 20);
   });
   btn.addEventListener('contextmenu', e => { e.preventDefault(); openCustom(e.clientX,e.clientY); });
