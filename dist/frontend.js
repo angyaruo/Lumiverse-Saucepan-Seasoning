@@ -203,14 +203,50 @@ export function setup(ctx) {
       </div>
     </div>`;
 
-  function mountStrip() {
-    if (document.getElementById('ri-strip')) return;
-    const ia = document.querySelector('[data-component="InputArea"]');
-    if (ia?.parentNode) ia.parentNode.insertBefore(strip, ia);
+  // InputArea is position:absolute;bottom:8px inside a flex parent.
+  // We can't use DOM flow. Instead: fix strip above InputArea via padding-bottom on parent.
+  document.body.appendChild(strip);
+
+  function getInputArea() {
+    return document.querySelector('[data-component="InputArea"]');
   }
-  mountStrip();
-  setTimeout(mountStrip, 800);
-  setTimeout(mountStrip, 2500);
+  function getInputParent() {
+    return getInputArea()?.parentElement;
+  }
+
+  function mountStrip() {
+    // no-op: strip is appended to body, positioned via JS below
+  }
+
+  function positionStrip() {
+    const ia = getInputArea();
+    if (!ia) return;
+    const rect = ia.getBoundingClientRect();
+    strip.style.position = 'fixed';
+    strip.style.left   = rect.left + 'px';
+    strip.style.right  = (window.innerWidth - rect.right) + 'px';
+    strip.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+    strip.style.zIndex = '9997';
+  }
+
+  function updateParentPadding() {
+    const parent = getInputParent();
+    if (!parent) return;
+    if (panelOpen && strip.classList.contains('open')) {
+      const h = strip.getBoundingClientRect().height;
+      parent.style.paddingBottom = h + 'px';
+    } else {
+      parent.style.paddingBottom = '';
+    }
+  }
+
+  const ro = new ResizeObserver(() => { positionStrip(); updateParentPadding(); });
+  const iaEl = getInputArea();
+  if (iaEl) ro.observe(iaEl);
+  window.addEventListener('resize', () => { positionStrip(); updateParentPadding(); });
+
+  // initial position (hidden but measured after open)
+  positionStrip();
 
   strip.querySelectorAll('.ri-stab').forEach(t => {
     t.addEventListener('click', () => {
@@ -222,6 +258,7 @@ export function setup(ctx) {
   });
   strip.querySelector('#ri-strip-close').addEventListener('click', () => {
     panelOpen = false; strip.classList.remove('open'); btn.classList.remove('active');
+    updateParentPadding();
   });
 
   const q = s => strip.querySelector(s);
@@ -276,8 +313,11 @@ export function setup(ctx) {
     if (!dragging) return; dragging=false;
     if (didDrag) { const r=btn.getBoundingClientRect(); C=saveCfg({x:r.left,y:r.top}); return; }
     closeCustom();
-    panelOpen=!panelOpen; mountStrip();
+    panelOpen=!panelOpen;
     strip.classList.toggle('open',panelOpen); btn.classList.toggle('active',panelOpen);
+    positionStrip();
+    // small delay to let strip render before measuring height
+    setTimeout(updateParentPadding, 20);
   });
   btn.addEventListener('contextmenu', e => { e.preventDefault(); openCustom(e.clientX,e.clientY); });
   let lpTimer=null;
@@ -286,7 +326,7 @@ export function setup(ctx) {
   btn.addEventListener('touchmove', ()=>{ if(lpTimer){clearTimeout(lpTimer);lpTimer=null;} });
 
   document.addEventListener('pointerdown', e => {
-    if (panelOpen&&!strip.contains(e.target)&&!btn.contains(e.target)) { panelOpen=false; strip.classList.remove('open'); btn.classList.remove('active'); }
+    if (panelOpen&&!strip.contains(e.target)&&!btn.contains(e.target)) { panelOpen=false; strip.classList.remove('open'); btn.classList.remove('active'); updateParentPadding(); }
     if (customOpen&&!customPopup.contains(e.target)&&!btn.contains(e.target)) closeCustom();
   }, true);
 
@@ -432,6 +472,10 @@ export function setup(ctx) {
   ctx.sendToBackend({type:'preset:load',store:'wfm'});
 
   return ()=>{
-    unsubBackend(); strip.remove(); btn.remove(); customPopup.remove(); styleEl.remove();
+    unsubBackend();
+    ro.disconnect();
+    const parent = getInputParent(); if (parent) parent.style.paddingBottom = '';
+    strip.remove(); btn.remove(); customPopup.remove(); styleEl.remove();
+    window.removeEventListener('resize', positionStrip);
   };
 }
