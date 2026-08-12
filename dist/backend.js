@@ -1,58 +1,59 @@
-// Response Instructions + Write For Me — Lumiverse Spindle Backend
+// Response Instructions + Write For Me — backend
 
 let activeInstruction = '';
 let instructionEnabled = false;
-let savedState = {
-  instruction: '',
-  enabled: false,
-  presets: {},
-  wfm_direction: '',
-};
+let savedPresets = {};
+let savedWfmDir = '';
 
-// ─── Load/save via spindle.storage ─────────────────────────────────────────────
-const STORAGE_KEY = 'ri_state';
-
+// ─── Storage (file-based: spindle.storage.read / write) ───────────────────────
 async function loadState() {
   try {
-    const raw = await spindle.storage.get(STORAGE_KEY);
-    if (raw) savedState = { ...savedState, ...JSON.parse(raw) };
+    const raw = await spindle.storage.read('state.json');
+    const parsed = JSON.parse(raw);
+    activeInstruction  = parsed.instruction   ?? '';
+    instructionEnabled = parsed.enabled       ?? false;
+    savedPresets       = parsed.presets       ?? {};
+    savedWfmDir        = parsed.wfm_direction ?? '';
   } catch (_) {}
 }
 
 async function persistState() {
   try {
-    await spindle.storage.set(STORAGE_KEY, JSON.stringify(savedState));
+    await spindle.storage.write('state.json', JSON.stringify({
+      instruction:   activeInstruction,
+      enabled:       instructionEnabled,
+      presets:       savedPresets,
+      wfm_direction: savedWfmDir,
+    }));
   } catch (_) {}
 }
 
 // ─── Frontend messages ────────────────────────────────────────────────────────
-spindle.on('frontend:message', async (payload) => {
+spindle.onFrontendMessage(async (payload, userId) => {
   if (!payload) return;
 
   if (payload.type === 'ri:load') {
-    // Frontend requests saved state on mount
     await loadState();
-    activeInstruction  = savedState.instruction ?? '';
-    instructionEnabled = savedState.enabled      ?? false;
-    spindle.sendToFrontend({ type: 'ri:state', state: savedState });
+    spindle.sendToFrontend({
+      type: 'ri:state',
+      state: {
+        instruction:   activeInstruction,
+        enabled:       instructionEnabled,
+        presets:       savedPresets,
+        wfm_direction: savedWfmDir,
+      },
+    }, userId);
   }
 
   if (payload.type === 'ri:update') {
-    // Frontend sends state updates
-    activeInstruction  = payload.instruction ?? '';
-    instructionEnabled = payload.enabled     ?? false;
-    savedState = {
-      ...savedState,
-      instruction:   activeInstruction,
-      enabled:       instructionEnabled,
-      presets:       payload.presets       ?? savedState.presets,
-      wfm_direction: payload.wfm_direction ?? savedState.wfm_direction,
-    };
+    activeInstruction  = payload.instruction   ?? activeInstruction;
+    instructionEnabled = payload.enabled       ?? instructionEnabled;
+    savedPresets       = payload.presets       ?? savedPresets;
+    savedWfmDir        = payload.wfm_direction ?? savedWfmDir;
     await persistState();
   }
 
   if (payload.type === 'ri:generate') {
-    // Frontend requests Write For Me generation
     const direction = payload.direction?.trim() || '';
     try {
       const result = await spindle.generate({
@@ -65,9 +66,9 @@ spindle.on('frontend:message', async (payload) => {
         max_tokens: 512,
       });
       const text = result?.text ?? result?.content ?? '';
-      spindle.sendToFrontend({ type: 'ri:draft', text });
+      spindle.sendToFrontend({ type: 'ri:draft', text }, userId);
     } catch (err) {
-      spindle.sendToFrontend({ type: 'ri:draft', text: '', error: err?.message ?? 'generation failed' });
+      spindle.sendToFrontend({ type: 'ri:draft', text: '', error: err?.message ?? 'generation failed' }, userId);
     }
   }
 });
@@ -75,22 +76,16 @@ spindle.on('frontend:message', async (payload) => {
 // ─── Prompt interceptor ────────────────────────────────────────────────────────
 spindle.registerInterceptor(async (messages) => {
   if (!instructionEnabled || !activeInstruction.trim()) return messages;
-
-  const injected = {
-    role: 'system',
-    content: `[Response Instructions]\n${activeInstruction.trim()}`,
-  };
-
+  const injected = { role: 'system', content: `[Response Instructions]\n${activeInstruction.trim()}` };
   let lastUserIdx = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === 'user') { lastUserIdx = i; break; }
   }
-
   const at = lastUserIdx === -1 ? messages.length : lastUserIdx;
   return [...messages.slice(0, at), injected, ...messages.slice(at)];
-});
+}, 10);
 
-// Init
+spindle.log.info('Response Instructions loaded!');
+
+// Init — load state so interceptor is armed on startup
 await loadState();
-activeInstruction  = savedState.instruction ?? '';
-instructionEnabled = savedState.enabled     ?? false;
