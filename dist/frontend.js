@@ -355,47 +355,41 @@ export function setup(ctx) {
   // revealing the toolbar row between it and the message list.
 
   const TOOLBAR_H = 34;
+  let baseSafeZone = 185;
 
   function getColumnInner() {
     return document.querySelector('[data-component="InputArea"]')?.parentElement ?? null;
   }
 
-  function updateSafeZone() {
-    const col = getColumnInner();
-    if (!col) return;
-    // Read Lumiverse's current value
-    const base = parseInt(getComputedStyle(col).getPropertyValue('--lcs-input-safe-zone')) || 185;
-    const panelH = document.getElementById('ri-panel')?.classList.contains('ri-open')
-      ? (document.getElementById('ri-panel')?.scrollHeight ?? 0)
-      : 0;
-    col.style.setProperty('--lcs-input-safe-zone', `${base + TOOLBAR_H + panelH}px`);
-  }
-
-  // Store original safe zone so we can restore it on cleanup
-  let originalSafeZone = null;
-
   function mount() {
     if (document.getElementById('ri-toolbar')) return;
-    const inputArea = document.querySelector('[data-component="InputArea"]');
-    if (!inputArea) return;
-    const parent = inputArea.parentElement;
-    if (!parent) return;
 
-    // Capture original safe zone before we touch it
-    if (originalSafeZone === null) {
-      originalSafeZone = getComputedStyle(parent).getPropertyValue('--lcs-input-safe-zone').trim() || '185px';
-    }
+    // Target the official Spindle slot inside InputArea — sits between
+    // the action bar row and the textarea input row
+    const slot = document.querySelector('[data-spindle-mount="chat_composer_above"]');
+    if (!slot) return;
+
+    // slot has display:contents — insert our elements as siblings after it,
+    // but still inside InputArea so Lumiverse's own layout handles the spacing
+    const inputArea = slot.closest('[data-component="InputArea"]');
+    if (!inputArea) return;
+
+    // Find the input row (textarea container) to insert before it
+    const inputRow = inputArea.querySelector('[class*="_inputRow_"]');
+    if (!inputRow) return;
 
     const toolbar = buildToolbar();
     const panel   = buildPanel();
-    parent.insertBefore(toolbar, inputArea);
-    parent.insertBefore(panel, toolbar);
 
-    // Watch panel open/close to update safe zone
-    new MutationObserver(() => updateSafeZone())
-      .observe(panel, { attributes: true, attributeFilter: ['class'] });
+    // Insert: panel then toolbar, both before the textarea row
+    inputArea.insertBefore(toolbar, inputRow);
+    inputArea.insertBefore(panel, toolbar);
 
-    updateSafeZone();
+    // Watch panel open/close — no safe zone needed, layout is inside InputArea
+    new MutationObserver(() => {
+      // Let InputArea grow naturally with its flex children
+    }).observe(panel, { attributes: true, attributeFilter: ['class'] });
+
     ctx.sendToBackend({ type: 'ri:load' });
   }
 
@@ -414,11 +408,7 @@ export function setup(ctx) {
     document.getElementById('ri-toolbar')?.remove();
     document.getElementById('ri-panel')?.remove();
     presetModal?.dismiss();
-    // Restore original safe zone
-    if (originalSafeZone !== null) {
-      const col = getColumnInner();
-      if (col) col.style.setProperty('--lcs-input-safe-zone', originalSafeZone);
-    }
+    // nothing to restore — layout is managed by InputArea
   };
 }
 
