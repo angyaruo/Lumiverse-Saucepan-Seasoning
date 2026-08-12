@@ -7,9 +7,9 @@ let savedWfmDir = '';
 let savedDrafts = [];
 
 // ─── Storage (file-based: spindle.storage.read / write) ───────────────────────
-async function loadState() {
+async function loadState(userId) {
   try {
-    const raw = await spindle.storage.read('state.json');
+    const raw = await spindle.storage.read(`state_${userId ?? 'default'}.json`);
     const parsed = JSON.parse(raw);
     activeInstruction  = parsed.instruction   ?? '';
     instructionEnabled = parsed.enabled       ?? false;
@@ -19,9 +19,9 @@ async function loadState() {
   } catch (_) {}
 }
 
-async function persistState() {
+async function persistState(userId) {
   try {
-    await spindle.storage.write('state.json', JSON.stringify({
+    await spindle.storage.write(`state_${userId ?? 'default'}.json`, JSON.stringify({
       instruction:   activeInstruction,
       enabled:       instructionEnabled,
       presets:       savedPresets,
@@ -36,7 +36,7 @@ spindle.onFrontendMessage(async (payload, userId) => {
   if (!payload) return;
 
   if (payload.type === 'ri:load') {
-    await loadState();
+    await loadState(userId);
     spindle.sendToFrontend({
       type: 'ri:state',
       state: {
@@ -55,7 +55,7 @@ spindle.onFrontendMessage(async (payload, userId) => {
     savedPresets       = payload.presets       ?? savedPresets;
     savedWfmDir        = payload.wfm_direction ?? savedWfmDir;
     savedDrafts        = payload.saved_drafts  ?? savedDrafts;
-    await persistState();
+    await persistState(userId);
   }
 
   if (payload.type === 'ri:generate') {
@@ -69,7 +69,7 @@ spindle.onFrontendMessage(async (payload, userId) => {
             : 'Draft a short message for me to send in this roleplay chat, fitting the current context.',
         }],
         parameters: { max_tokens: 512 },
-      }, userId);
+      });
       const text = result?.content ?? '';
       spindle.sendToFrontend({ type: 'ri:draft', text }, userId);
     } catch (err) {
@@ -93,4 +93,4 @@ spindle.registerInterceptor(async (messages) => {
 spindle.log.info('Response Instructions loaded!');
 
 // Init — load state so interceptor is armed on startup
-await loadState();
+await loadState('default');
