@@ -26,6 +26,7 @@ async function persistState() {
       enabled:       instructionEnabled,
       presets:       savedPresets,
       wfm_direction: savedWfmDir,
+      saved_drafts:  savedDrafts,
     }));
   } catch (_) {}
 }
@@ -68,7 +69,7 @@ spindle.onFrontendMessage(async (payload, userId) => {
             : 'Draft a short message for me to send in this roleplay chat, fitting the current context.',
         }],
         parameters: { max_tokens: 512 },
-      });
+      }, userId);
       const text = result?.content ?? '';
       spindle.sendToFrontend({ type: 'ri:draft', text }, userId);
     } catch (err) {
