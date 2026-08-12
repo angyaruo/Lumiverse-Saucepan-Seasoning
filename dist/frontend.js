@@ -349,6 +349,31 @@ export function setup(ctx) {
   }
 
   // ─── Mount ────────────────────────────────────────────────────────────────────
+  // InputArea is position:absolute inside chatColumnInner, pinned via
+  // --lcs-input-safe-zone (which also controls the message list bottom padding).
+  // We bump that variable up by our toolbar height so InputArea shifts up,
+  // revealing the toolbar row between it and the message list.
+
+  const TOOLBAR_H = 34;
+
+  function getColumnInner() {
+    return document.querySelector('[data-component="InputArea"]')?.parentElement ?? null;
+  }
+
+  function updateSafeZone() {
+    const col = getColumnInner();
+    if (!col) return;
+    // Read Lumiverse's current value
+    const base = parseInt(getComputedStyle(col).getPropertyValue('--lcs-input-safe-zone')) || 185;
+    const panelH = document.getElementById('ri-panel')?.classList.contains('ri-open')
+      ? (document.getElementById('ri-panel')?.scrollHeight ?? 0)
+      : 0;
+    col.style.setProperty('--lcs-input-safe-zone', `${base + TOOLBAR_H + panelH}px`);
+  }
+
+  // Store original safe zone so we can restore it on cleanup
+  let originalSafeZone = null;
+
   function mount() {
     if (document.getElementById('ri-toolbar')) return;
     const inputArea = document.querySelector('[data-component="InputArea"]');
@@ -356,11 +381,21 @@ export function setup(ctx) {
     const parent = inputArea.parentElement;
     if (!parent) return;
 
+    // Capture original safe zone before we touch it
+    if (originalSafeZone === null) {
+      originalSafeZone = getComputedStyle(parent).getPropertyValue('--lcs-input-safe-zone').trim() || '185px';
+    }
+
     const toolbar = buildToolbar();
     const panel   = buildPanel();
     parent.insertBefore(toolbar, inputArea);
     parent.insertBefore(panel, toolbar);
 
+    // Watch panel open/close to update safe zone
+    new MutationObserver(() => updateSafeZone())
+      .observe(panel, { attributes: true, attributeFilter: ['class'] });
+
+    updateSafeZone();
     ctx.sendToBackend({ type: 'ri:load' });
   }
 
@@ -379,9 +414,15 @@ export function setup(ctx) {
     document.getElementById('ri-toolbar')?.remove();
     document.getElementById('ri-panel')?.remove();
     presetModal?.dismiss();
+    // Restore original safe zone
+    if (originalSafeZone !== null) {
+      const col = getColumnInner();
+      if (col) col.style.setProperty('--lcs-input-safe-zone', originalSafeZone);
+    }
   };
 }
 
 function esc(s = '') {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+// THIS IS WRONG - just checking
