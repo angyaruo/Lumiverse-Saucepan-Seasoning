@@ -4,7 +4,7 @@
 
 Port of SaucepanAI's response instructions and write-for-me UI for **Lumiverse**, built as a native Spindle extension. Made this because I kept wanting Saucepan's in-chat commands while using Lumiverse and figured porting them was less painful than context-switching forever.
 
-Disclaimer: vibe-coded with Claude. Tested before publishing because I'm not a rat.
+Disclaimer: Vibe-coded with Claude. Tested before publishing because I'm not a rat.
 
 ---
 
