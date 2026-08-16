@@ -1,6 +1,6 @@
-# Response Instructions + Write For Me — Lumiverse
+# Saucepan Seasoning — Lumiverse
 
-Port of [bumyann/sillytavern-response-instructions](https://github.com/bumyann/sillytavern-response-instructions) for **Lumiverse** via the Spindle framework.
+Port of SaucepanAI's in-chat commands for **Lumiverse** via the Spindle framework.
 
 ## Features
 
