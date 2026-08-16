@@ -61,7 +61,13 @@ spindle.onFrontendMessage(async (payload, userId) => {
   if (payload.type === 'ri:generate') {
     const direction = payload.direction?.trim() || '';
     try {
+      const connections = await spindle.connections.list(userId);
+      const conn = connections?.find(c => c.is_default) ?? connections?.[0];
+      if (!conn) throw new Error('No connection available — configure one in Lumiverse settings.');
       const result = await spindle.generate.quiet({
+        type: 'quiet',
+        userId,
+        connection_id: conn.id,
         messages: [{
           role: 'user',
           content: direction
@@ -69,6 +75,7 @@ spindle.onFrontendMessage(async (payload, userId) => {
             : 'Draft a short message for me to send in this roleplay chat, fitting the current context.',
         }],
         parameters: { max_tokens: 512 },
+        reasoning: { source: 'off' },
       });
       const text = result?.content ?? '';
       spindle.sendToFrontend({ type: 'ri:draft', text }, userId);
