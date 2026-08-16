@@ -10,7 +10,7 @@ Disclaimer: Vibe-coded with Claude. Tested before publishing because I'm not a r
 
 ## Features
 
-### 📋 Response Instructions
+### ✦ Response Instructions
 
 Inject a steering instruction into the prompt before every AI reply — no character limit, no fuss.
 
