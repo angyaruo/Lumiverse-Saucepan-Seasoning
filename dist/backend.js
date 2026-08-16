@@ -5,6 +5,8 @@ let instructionEnabled = false;
 let savedPresets = {};
 let savedWfmDir = '';
 let savedDrafts = [];
+let savedRiMode = 'simple';
+let savedSimple = {};
 
 // ─── Storage (file-based: spindle.storage.read / write) ───────────────────────
 async function loadState(userId) {
@@ -16,6 +18,8 @@ async function loadState(userId) {
     savedPresets       = parsed.presets       ?? {};
     savedWfmDir        = parsed.wfm_direction ?? '';
     savedDrafts        = parsed.saved_drafts  ?? [];
+    savedRiMode        = parsed.ri_mode       ?? 'simple';
+    savedSimple        = parsed.simple        ?? {};
   } catch (_) {}
 }
 
@@ -27,6 +31,8 @@ async function persistState(userId) {
       presets:       savedPresets,
       wfm_direction: savedWfmDir,
       saved_drafts:  savedDrafts,
+      ri_mode:       savedRiMode,
+      simple:        savedSimple,
     }));
   } catch (_) {}
 }
@@ -45,16 +51,22 @@ spindle.onFrontendMessage(async (payload, userId) => {
         presets:       savedPresets,
         wfm_direction: savedWfmDir,
         saved_drafts:  savedDrafts,
+        ri_mode:       savedRiMode,
+        simple:        savedSimple,
       },
     }, userId);
   }
 
   if (payload.type === 'ri:update') {
-    activeInstruction  = payload.instruction   ?? activeInstruction;
+    // _active_instruction is the composed string (simple or custom mode)
+    activeInstruction  = payload._active_instruction ?? payload.instruction ?? activeInstruction;
     instructionEnabled = payload.enabled       ?? instructionEnabled;
     savedPresets       = payload.presets       ?? savedPresets;
     savedWfmDir        = payload.wfm_direction ?? savedWfmDir;
     savedDrafts        = payload.saved_drafts  ?? savedDrafts;
+    savedRiMode        = payload.ri_mode       ?? savedRiMode;
+    savedSimple        = payload.simple        ?? savedSimple;
+    // persist full state for reload
     await persistState(userId);
   }
 

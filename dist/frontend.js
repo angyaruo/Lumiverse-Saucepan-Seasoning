@@ -29,7 +29,13 @@ const IC = {
 
 export function setup(ctx) {
 
-  let state = { instruction: '', enabled: false, presets: {}, wfm_direction: '', saved_drafts: [] };
+  let state = {
+    instruction: '', enabled: false, presets: {}, wfm_direction: '', saved_drafts: [],
+    ri_mode: 'simple', // 'simple' | 'custom'
+    simple: {
+      own: '', length: '', style: '', speak_for: '', intimacy: '', pacing: '', narration: '',
+    },
+  };
   let panelOpen = false, activeTab = 'ri';
   let drafts = [], draftIdx = 0, generating = false;
   let wfmView = 'generate'; // 'generate' | 'saved'
@@ -214,6 +220,57 @@ export function setup(ctx) {
     .ri-saved-del:hover { color: #f87171; border-color: #f87171; }
     .ri-empty { font-size: 11.5px; color: var(--lumiverse-text-dim); padding: 8px 4px; text-align: center; }
 
+    /* simple mode */
+    .ri-mode-tabs {
+      display: flex; gap: 2px; padding: 5px 10px 0;
+      border-bottom: 1px solid var(--lumiverse-border);
+    }
+    .ri-mode-tab {
+      padding: 3px 10px; border-radius: 4px 4px 0 0; font-size: 11.5px; font-family: inherit;
+      background: none; border: 1px solid transparent; border-bottom: none;
+      color: var(--lumiverse-text-dim); cursor: pointer;
+      transition: color 0.12s, background 0.12s;
+    }
+    .ri-mode-tab:hover { color: var(--lumiverse-text); }
+    .ri-mode-tab.ri-on {
+      color: var(--lumiverse-accent); background: var(--lumiverse-fill);
+      border-color: var(--lumiverse-border);
+    }
+    .ri-simple-body {
+      padding: 8px 10px; display: flex; flex-direction: column; gap: 10px;
+      max-height: 260px; overflow-y: auto;
+    }
+    .ri-field { display: flex; flex-direction: column; gap: 4px; }
+    .ri-field-label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--lumiverse-text-dim); font-weight: 600;
+    }
+    .ri-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .ri-chip {
+      padding: 2px 10px; border-radius: 20px; font-size: 11.5px; font-family: inherit;
+      border: 1px solid var(--lumiverse-border); background: transparent;
+      color: var(--lumiverse-text-muted); cursor: pointer;
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
+    }
+    .ri-chip:hover { border-color: var(--lumiverse-accent); color: var(--lumiverse-text); }
+    .ri-chip.ri-on {
+      border-color: var(--lumiverse-accent); color: var(--lumiverse-accent);
+      background: color-mix(in srgb, var(--lumiverse-accent) 12%, transparent);
+      font-weight: 600;
+    }
+    .ri-simple-ta {
+      width: 100%; box-sizing: border-box; min-height: 44px; resize: vertical;
+      background: var(--lumiverse-fill-subtle); border: 1px solid var(--lumiverse-border);
+      border-radius: var(--lumiverse-radius); color: var(--lumiverse-text);
+      font-size: 12px; font-family: inherit; padding: 5px 8px; outline: none;
+      transition: border-color 0.14s;
+    }
+    .ri-simple-ta:focus { border-color: var(--lumiverse-accent); }
+    .ri-composed-preview {
+      font-size: 11px; color: var(--lumiverse-text-dim); font-style: italic;
+      padding: 4px 0 0; min-height: 14px; line-height: 1.4;
+    }
+
     /* presets modal */
     .ri-preset-list { display: flex; flex-direction: column; gap: 3px; max-height: 200px; overflow-y: auto; }
     .ri-preset-row {
@@ -277,7 +334,79 @@ export function setup(ctx) {
           <button class="ri-hbtn" id="ri-clear-btn" title="Clear">${IC.trash}</button>
           <button class="ri-hbtn" id="ri-close-ri"  title="Close">${IC.close}</button>
         </div>
-        <div class="ri-body">
+        <!-- Simple / Custom mode tabs -->
+        <div class="ri-mode-tabs">
+          <button class="ri-mode-tab ri-on" id="ri-mode-simple">Simple</button>
+          <button class="ri-mode-tab" id="ri-mode-custom">Custom</button>
+        </div>
+
+        <!-- Simple mode -->
+        <div class="ri-simple-body" id="ri-simple-body">
+          <div class="ri-field">
+            <div class="ri-field-label">Your own instructions</div>
+            <textarea class="ri-simple-ta" id="ri-simple-own" placeholder="Anything else? e.g. {{companion}} loses his memories"></textarea>
+          </div>
+          <div class="ri-field">
+            <div class="ri-field-label">Length</div>
+            <div class="ri-chips" data-field="length">
+              <button class="ri-chip ri-on" data-val="">Default</button>
+              <button class="ri-chip" data-val="short">Short</button>
+              <button class="ri-chip" data-val="medium">Medium</button>
+              <button class="ri-chip" data-val="long">Long</button>
+              <button class="ri-chip" data-val="essay">Essay</button>
+              <button class="ri-chip" data-val="ramble">Ramble</button>
+            </div>
+          </div>
+          <div class="ri-field">
+            <div class="ri-field-label">Style</div>
+            <div class="ri-chips" data-field="style">
+              <button class="ri-chip ri-on" data-val="">Default</button>
+              <button class="ri-chip" data-val="first person">First Person</button>
+              <button class="ri-chip" data-val="second person">Second Person</button>
+              <button class="ri-chip" data-val="third person">Third Person</button>
+              <button class="ri-chip" data-val="text messaging style">Text Messaging</button>
+            </div>
+          </div>
+          <div class="ri-field">
+            <div class="ri-field-label">Speak For</div>
+            <div class="ri-chips" data-field="speak_for">
+              <button class="ri-chip ri-on" data-val="">Default</button>
+              <button class="ri-chip" data-val="companion only">Companion only</button>
+              <button class="ri-chip" data-val="both characters">Both</button>
+            </div>
+          </div>
+          <div class="ri-field">
+            <div class="ri-field-label">Intimacy</div>
+            <div class="ri-chips" data-field="intimacy">
+              <button class="ri-chip ri-on" data-val="">Default</button>
+              <button class="ri-chip" data-val="platonic">Platonic</button>
+              <button class="ri-chip" data-val="romantic">Romantic</button>
+              <button class="ri-chip" data-val="sexual">Sexual</button>
+              <button class="ri-chip" data-val="explicit">Explicit</button>
+            </div>
+          </div>
+          <div class="ri-field">
+            <div class="ri-field-label">Story Pacing</div>
+            <div class="ri-chips" data-field="pacing">
+              <button class="ri-chip ri-on" data-val="">Default</button>
+              <button class="ri-chip" data-val="slow">Slow</button>
+              <button class="ri-chip" data-val="fast">Fast</button>
+            </div>
+          </div>
+          <div class="ri-field">
+            <div class="ri-field-label">Narration vs Dialogue</div>
+            <div class="ri-chips" data-field="narration">
+              <button class="ri-chip ri-on" data-val="">Default</button>
+              <button class="ri-chip" data-val="narration-focused">Narration</button>
+              <button class="ri-chip" data-val="balanced narration and dialogue">Balanced</button>
+              <button class="ri-chip" data-val="dialogue-focused">Dialogue</button>
+            </div>
+          </div>
+          <div class="ri-composed-preview" id="ri-composed-preview"></div>
+        </div>
+
+        <!-- Custom mode -->
+        <div class="ri-body" id="ri-custom-body" style="display:none;">
           <textarea class="ri-ta" id="ri-instr-ta" placeholder="Write response instructions here… injected into the next prompt."></textarea>
         </div>
       </div>
@@ -331,9 +460,41 @@ export function setup(ctx) {
     ta.oninput   = () => { state.instruction = ta.value; push(); };
     chk.onchange = () => { state.enabled = chk.checked; refreshRiBtn(); push(); };
     el.querySelector('#ri-clear-btn').onclick = () => {
-      state.instruction = ''; state.enabled = false;
-      ta.value = ''; chk.checked = false; refreshRiBtn(); push();
+      if (state.ri_mode === 'custom') {
+        state.instruction = '';
+        if (ta) ta.value = '';
+      } else {
+        state.simple = { own: '', length: '', style: '', speak_for: '', intimacy: '', pacing: '', narration: '' };
+        applySimpleToUI();
+      }
+      state.enabled = false;
+      if (chk) chk.checked = false;
+      refreshRiBtn(); push();
     };
+    // Mode tab switching
+    el.querySelector('#ri-mode-simple').onclick = () => setRiMode('simple');
+    el.querySelector('#ri-mode-custom').onclick  = () => setRiMode('custom');
+
+    // Simple mode — chip groups
+    el.querySelectorAll('.ri-chips').forEach(group => {
+      group.querySelectorAll('.ri-chip').forEach(chip => {
+        chip.onclick = () => {
+          group.querySelectorAll('.ri-chip').forEach(c => c.classList.remove('ri-on'));
+          chip.classList.add('ri-on');
+          state.simple[group.dataset.field] = chip.dataset.val;
+          updateComposedPreview();
+          push();
+        };
+      });
+    });
+
+    // Simple mode — own instructions textarea
+    el.querySelector('#ri-simple-own').oninput = (e) => {
+      state.simple.own = e.target.value;
+      updateComposedPreview();
+      push();
+    };
+
     el.querySelector('#ri-preset-btn').onclick = openPresets;
     el.querySelector('#ri-close-ri').onclick   = closePanel;
     el.querySelector('#ri-close-wfm').onclick  = closePanel;
@@ -490,7 +651,59 @@ export function setup(ctx) {
     if (ta)  ta.value    = state.instruction;
     if (chk) chk.checked = state.enabled;
     if (dir) dir.value   = state.wfm_direction;
+    setRiMode(state.ri_mode ?? 'simple', true);
+    applySimpleToUI();
     refreshRiBtn();
+  }
+
+  function applySimpleToUI() {
+    const s = state.simple ?? {};
+    const own = document.getElementById('ri-simple-own');
+    if (own) own.value = s.own ?? '';
+    // restore chip selections
+    document.querySelectorAll('.ri-chips').forEach(group => {
+      const val = s[group.dataset.field] ?? '';
+      group.querySelectorAll('.ri-chip').forEach(chip => {
+        chip.classList.toggle('ri-on', chip.dataset.val === val);
+      });
+    });
+    updateComposedPreview();
+  }
+
+  function setRiMode(mode, silent) {
+    state.ri_mode = mode;
+    document.getElementById('ri-simple-body').style.display = mode === 'simple' ? 'flex' : 'none';
+    document.getElementById('ri-custom-body').style.display = mode === 'custom' ? 'flex' : 'none';
+    document.getElementById('ri-mode-simple')?.classList.toggle('ri-on', mode === 'simple');
+    document.getElementById('ri-mode-custom')?.classList.toggle('ri-on', mode === 'custom');
+    if (!silent) push();
+  }
+
+  // Compose natural language instruction from Simple selections
+  function composeSimple() {
+    const s = state.simple ?? {};
+    const parts = [];
+    if (s.length)    parts.push(`Keep responses ${s.length} in length.`);
+    if (s.style)     parts.push(`Write in ${s.style}.`);
+    if (s.speak_for) parts.push(`Speak for ${s.speak_for}.`);
+    if (s.intimacy)  parts.push(`Keep the tone ${s.intimacy}.`);
+    if (s.pacing)    parts.push(`Use a ${s.pacing} story pace.`);
+    if (s.narration) parts.push(`Prefer ${s.narration}.`);
+    if (s.own?.trim()) parts.push(s.own.trim());
+    return parts.join(' ');
+  }
+
+  function updateComposedPreview() {
+    const el = document.getElementById('ri-composed-preview');
+    if (!el) return;
+    const composed = composeSimple();
+    el.textContent = composed || 'No instructions set — all fields are default.';
+  }
+
+  // Returns the active instruction string based on current mode
+  function getActiveInstruction() {
+    if ((state.ri_mode ?? 'simple') === 'simple') return composeSimple();
+    return state.instruction;
   }
 
   // ─── Presets modal ────────────────────────────────────────────────────────────
@@ -548,7 +761,7 @@ export function setup(ctx) {
 
   // ─── Backend ──────────────────────────────────────────────────────────────────
   function push() {
-    ctx.sendToBackend({ type: 'ri:update', ...state });
+    ctx.sendToBackend({ type: 'ri:update', ...state, _active_instruction: getActiveInstruction() });
   }
 
   const unsubMsg = ctx.onBackendMessage((payload) => {
