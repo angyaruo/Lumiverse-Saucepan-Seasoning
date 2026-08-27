@@ -6,11 +6,12 @@
   "github": "https://github.com/bumyann/lumiverse-response-instructions",
   "homepage": "https://github.com/bumyann/lumiverse-response-instructions",
   "permissions": [
-    "interceptor",
     "generation",
+    "interceptor",
     "chats",
     "characters",
-    "connections",
+    "personas",
+    "presets",
     "world_books"
   ],
   "entry_backend": "dist/backend.js",
