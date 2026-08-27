@@ -8,6 +8,7 @@ let savedDrafts = [];
 let savedRiMode = 'simple';
 let savedSimple = {};
 let savedTemplates = {};
+let savedSelectedConn = '';
 
 const DEFAULT_TEMPLATES = {
   system_prompt: `You are a creative fiction ghostwriter in an ongoing novel-style roleplay between {{user}} and {{char}}.
@@ -42,14 +43,15 @@ async function loadState(userId) {
   try {
     const raw = await spindle.storage.read(`state_${userId ?? 'default'}.json`);
     const parsed = JSON.parse(raw);
-    activeInstruction  = parsed.instruction   ?? '';
-    instructionEnabled = parsed.enabled       ?? false;
-    savedPresets       = parsed.presets       ?? {};
-    savedWfmDir        = parsed.wfm_direction ?? '';
-    savedDrafts        = parsed.saved_drafts  ?? [];
-    savedRiMode        = parsed.ri_mode       ?? 'simple';
-    savedSimple        = parsed.simple        ?? {};
-    savedTemplates     = parsed.templates     ?? { ...DEFAULT_TEMPLATES };
+    activeInstruction   = parsed.instruction          ?? '';
+    instructionEnabled  = parsed.enabled              ?? false;
+    savedPresets        = parsed.presets              ?? {};
+    savedWfmDir         = parsed.wfm_direction        ?? '';
+    savedDrafts         = parsed.saved_drafts         ?? [];
+    savedRiMode         = parsed.ri_mode              ?? 'simple';
+    savedSimple         = parsed.simple               ?? {};
+    savedSelectedConn   = parsed.selected_connection  ?? '';
+    savedTemplates      = parsed.templates            ?? { ...DEFAULT_TEMPLATES };
   } catch (_) {
     savedTemplates = { ...DEFAULT_TEMPLATES };
   }
@@ -58,14 +60,15 @@ async function loadState(userId) {
 async function persistState(userId) {
   try {
     await spindle.storage.write(`state_${userId ?? 'default'}.json`, JSON.stringify({
-      instruction:   activeInstruction,
-      enabled:       instructionEnabled,
-      presets:       savedPresets,
-      wfm_direction: savedWfmDir,
-      saved_drafts:  savedDrafts,
-      ri_mode:       savedRiMode,
-      simple:        savedSimple,
-      templates:     savedTemplates,
+      instruction:          activeInstruction,
+      enabled:              instructionEnabled,
+      presets:              savedPresets,
+      wfm_direction:        savedWfmDir,
+      saved_drafts:         savedDrafts,
+      ri_mode:              savedRiMode,
+      simple:               savedSimple,
+      selected_connection:  savedSelectedConn,
+      templates:            savedTemplates,
     }));
   } catch (_) {}
 }
@@ -85,30 +88,38 @@ spindle.onFrontendMessage(async (payload, userId) => {
 
   if (payload.type === 'ri:load') {
     await loadState(userId);
+    let connections = [];
+    try {
+      connections = await spindle.connections.list(userId);
+    } catch (_) {}
+
     spindle.sendToFrontend({
       type: 'ri:state',
+      connections: connections.map(c => ({ id: c.id, name: c.name, provider: c.provider, model: c.model })),
       state: {
-        instruction:   activeInstruction,
-        enabled:       instructionEnabled,
-        presets:       savedPresets,
-        wfm_direction: savedWfmDir,
-        saved_drafts:  savedDrafts,
-        ri_mode:       savedRiMode,
-        simple:        savedSimple,
-        templates:     savedTemplates,
+        instruction:          activeInstruction,
+        enabled:              instructionEnabled,
+        presets:              savedPresets,
+        wfm_direction:        savedWfmDir,
+        saved_drafts:         savedDrafts,
+        ri_mode:              savedRiMode,
+        simple:               savedSimple,
+        selected_connection:  savedSelectedConn,
+        templates:            savedTemplates,
       },
     }, userId);
   }
 
   if (payload.type === 'ri:update') {
     activeInstruction  = payload._active_instruction ?? payload.instruction ?? activeInstruction;
-    instructionEnabled = payload.enabled       ?? instructionEnabled;
-    savedPresets       = payload.presets       ?? savedPresets;
-    savedWfmDir        = payload.wfm_direction ?? savedWfmDir;
-    savedDrafts        = payload.saved_drafts  ?? savedDrafts;
-    savedRiMode        = payload.ri_mode       ?? savedRiMode;
-    savedSimple        = payload.simple        ?? savedSimple;
-    savedTemplates     = payload.templates     ?? savedTemplates;
+    instructionEnabled = payload.enabled              ?? instructionEnabled;
+    savedPresets       = payload.presets              ?? savedPresets;
+    savedWfmDir        = payload.wfm_direction        ?? savedWfmDir;
+    savedDrafts        = payload.saved_drafts         ?? savedDrafts;
+    savedRiMode        = payload.ri_mode              ?? savedRiMode;
+    savedSimple        = payload.simple               ?? savedSimple;
+    savedSelectedConn  = payload.selected_connection  ?? savedSelectedConn;
+    savedTemplates     = payload.templates            ?? savedTemplates;
     await persistState(userId);
   }
 
@@ -118,11 +129,18 @@ spindle.onFrontendMessage(async (payload, userId) => {
     const charName = payload.charName || 'the companion';
     const personaName = payload.personaName || 'the user';
     const contextSnippet = payload.contextSnippet?.trim() || '';
+    const requestedConnId = payload.connectionId;
 
     try {
       const connections = await spindle.connections.list(userId);
-      const conn = connections?.find(c => c.is_default) ?? connections?.[0];
-      if (!conn) throw new Error('No connection profile found in Lumiverse settings.');
+      let targetConn = null;
+      if (requestedConnId) {
+        targetConn = connections?.find(c => c.id === requestedConnId);
+      }
+      if (!targetConn) {
+        targetConn = connections?.find(c => c.is_default) ?? connections?.[0];
+      }
+      if (!targetConn) throw new Error('No connection profile found in Lumiverse settings.');
 
       const tpls = { ...DEFAULT_TEMPLATES, ...savedTemplates };
       const vars = {
@@ -142,7 +160,7 @@ spindle.onFrontendMessage(async (payload, userId) => {
       const result = await spindle.generate.quiet({
         type: 'quiet',
         userId,
-        connection_id: conn.id,
+        connection_id: targetConn.id,
         messages: [{ role: 'user', content: fullPrompt }],
         parameters: { max_tokens: 600, temperature: 0.8 },
         reasoning: { source: 'off' },
