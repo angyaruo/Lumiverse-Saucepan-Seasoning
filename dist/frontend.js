@@ -268,6 +268,49 @@ export function setup(ctx) {
     .ri-composed-preview { font-size: 11px; color: var(--lumiverse-text-dim); font-style: italic; padding: 4px 0 0; min-height: 14px; line-height: 1.4; }
 
     .ri-help-text { font-size: 10.5px; color: var(--lumiverse-text-dim); line-height: 1.4; }
+
+    /* ─── Mobile Viewport Optimizations (max-width: 768px) ─── */
+    @media (max-width: 768px) {
+      #ri-toolbar { padding: 2px 6px; gap: 2px; }
+      .ri-icon-btn { width: 24px; height: 24px; }
+      .ri-icon-btn svg { width: 12px; height: 12px; }
+      #ri-panel.ri-open { max-height: 340px; }
+      
+      .ri-header { padding: 4px 8px; font-size: 9.5px; }
+      .ri-body { padding: 6px 8px; gap: 5px; max-height: 290px; }
+      
+      .ri-ta {
+        font-size: 11px !important;
+        padding: 4px 7px !important;
+      }
+      #ri-instr-ta { min-height: 52px; }
+      #ri-dir-ta   { min-height: 32px; }
+      
+      .ri-label { font-size: 9px; margin-bottom: 2px; }
+      .ri-preview { font-size: 10.5px; padding: 4px 7px; max-height: 46px; }
+      .ri-draft-box { font-size: 11px; padding: 5px 7px; max-height: 75px; }
+      
+      .ri-wfm-actions { gap: 4px; }
+      .ri-select {
+        font-size: 10px !important;
+        padding: 3px 5px !important;
+        max-width: 105px !important;
+      }
+      .ri-btn {
+        font-size: 10.5px !important;
+        padding: 4px 6px !important;
+      }
+      
+      .ri-chips .ri-chip {
+        font-size: 10px !important;
+        padding: 2px 7px !important;
+      }
+      .ri-simple-ta {
+        font-size: 10.5px !important;
+        min-height: 36px !important;
+        padding: 4px 6px !important;
+      }
+    }
   `);
 
   function getComposerInput() {
