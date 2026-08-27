@@ -47,10 +47,12 @@ CRITICAL RULES:
 export function setup(ctx) {
   let state = {
     instruction: '', enabled: false, presets: {}, wfm_direction: '', saved_drafts: [],
+    selected_connection: '',
     ri_mode: 'simple',
     simple: { own: '', length: '', style: '', speak_for: '', intimacy: '', pacing: '', narration: '' },
     templates: { ...DEFAULT_TEMPLATES }
   };
+  let connectionsList = [];
   let panelOpen = false, activeTab = 'ri';
   let drafts = [], draftIdx = 0, generating = false;
   let wfmView = 'generate';
@@ -170,6 +172,13 @@ export function setup(ctx) {
     .ri-draft-box.ri-visible { display: block; }
 
     .ri-wfm-actions { display: flex; gap: 6px; align-items: center; }
+    .ri-select {
+      background: var(--lumiverse-fill-subtle); border: 1px solid var(--lumiverse-border);
+      border-radius: var(--lumiverse-radius); color: var(--lumiverse-text);
+      font-size: 11.5px; font-family: inherit; padding: 5px 7px; outline: none;
+      max-width: 140px; cursor: pointer;
+    }
+    .ri-select:focus { border-color: var(--lumiverse-accent); }
     .ri-btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 5px;
       padding: 5px 10px; border-radius: var(--lumiverse-radius);
@@ -416,6 +425,9 @@ export function setup(ctx) {
             <textarea class="ri-ta" id="ri-dir-ta" placeholder="e.g. 'act shy', 'confess feelings', 'change the subject'…"></textarea>
           </div>
           <div class="ri-wfm-actions">
+            <select class="ri-select" id="ri-conn-select" title="Select Model Connection">
+              <option value="">Default Connection</option>
+            </select>
             <button class="ri-btn ri-btn-gen" id="ri-gen">${IC.gen} Generate</button>
             <button class="ri-btn ri-btn-use" id="ri-use" disabled>${IC.use} Use this</button>
           </div>
@@ -518,6 +530,12 @@ export function setup(ctx) {
       setTimeout(() => { btn.innerHTML = IC.save; }, 1200);
     };
 
+    const connSelect = el.querySelector('#ri-conn-select');
+    connSelect.onchange = () => {
+      state.selected_connection = connSelect.value;
+      push();
+    };
+
     // Template Wiring
     const tplSys = el.querySelector('#ri-tpl-system');
     const tplRew = el.querySelector('#ri-tpl-rewrite');
@@ -600,6 +618,20 @@ export function setup(ctx) {
     }
   }
 
+  function populateConnectionsUI() {
+    const select = document.getElementById('ri-conn-select');
+    if (!select) return;
+    const currentVal = state.selected_connection;
+    select.innerHTML = '<option value="">Default Connection</option>';
+    connectionsList.forEach(conn => {
+      const opt = document.createElement('option');
+      opt.value = conn.id;
+      opt.textContent = `${conn.name || conn.provider || 'Connection'} (${conn.model || 'default'})`;
+      if (conn.id === currentVal) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
   // ─── Generate ────────────────────────────────────────────────────────────────
   function generate() {
     if (generating) return;
@@ -633,6 +665,7 @@ export function setup(ctx) {
       userInput: currentInput,
       charName: charName,
       personaName: personaName,
+      connectionId: state.selected_connection || '',
       contextSnippet: snippets.join('\n\n---\n\n')
     });
   }
@@ -669,7 +702,7 @@ export function setup(ctx) {
     document.getElementById('ri-tab-ri').style.display  = tab === 'ri'  ? 'block' : 'none';
     document.getElementById('ri-tab-wfm').style.display = tab === 'wfm' ? 'block' : 'none';
     document.getElementById('ri-tab-tpl').style.display = tab === 'tpl' ? 'block' : 'none';
-    if (tab === 'wfm') { updatePreview(); setWfmView(wfmView); }
+    if (tab === 'wfm') { updatePreview(); setWfmView(wfmView); populateConnectionsUI(); }
     refreshBtns();
   }
 
@@ -710,6 +743,7 @@ export function setup(ctx) {
 
     setRiMode(state.ri_mode ?? 'simple', true);
     applySimpleToUI();
+    populateConnectionsUI();
     refreshRiBtn();
   }
 
@@ -799,7 +833,10 @@ export function setup(ctx) {
 
   const unsubMsg = ctx.onBackendMessage((payload) => {
     if (payload.type === 'ri:state') {
-      state = { saved_drafts: [], templates: { ...DEFAULT_TEMPLATES }, ...state, ...payload.state };
+      state = { saved_drafts: [], selected_connection: '', templates: { ...DEFAULT_TEMPLATES }, ...state, ...payload.state };
+      if (Array.isArray(payload.connections)) {
+        connectionsList = payload.connections;
+      }
       applyStateToUI();
       ctx.sendToBackend({ type: 'ri:update', ...state });
     }
