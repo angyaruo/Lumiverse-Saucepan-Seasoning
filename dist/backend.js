@@ -8,6 +8,7 @@ let savedDrafts = [];
 let savedRiMode = 'simple';
 let savedSimple = {};
 let savedTemplates = {};
+let savedSelectedConn = '';
 let wfmIncludePreset = false;
 let wfmPresetId = null;
 let savedRiPresets = [];
@@ -46,18 +47,19 @@ async function loadState(userId) {
   try {
     const raw = await spindle.storage.read(`state_${userId ?? 'default'}.json`);
     const parsed = JSON.parse(raw);
-    activeInstruction  = parsed.instruction   ?? '';
-    instructionEnabled = parsed.enabled       ?? false;
-    savedPresets       = parsed.presets       ?? {};
-    savedWfmDir        = parsed.wfm_direction ?? '';
-    savedDrafts        = parsed.saved_drafts  ?? [];
-    savedRiMode        = parsed.ri_mode       ?? 'simple';
-    savedSimple        = parsed.simple        ?? {};
-    savedTemplates     = parsed.templates       ?? { ...DEFAULT_TEMPLATES };
-    wfmIncludePreset   = parsed.wfm_include_preset ?? false;
-    wfmPresetId        = parsed.wfm_preset_id      ?? null;
-    savedRiPresets     = parsed.ri_presets         ?? [];
-    savedWfmDirPresets = parsed.wfm_dir_presets    ?? [];
+    activeInstruction   = parsed.instruction          ?? '';
+    instructionEnabled  = parsed.enabled              ?? false;
+    savedPresets        = parsed.presets              ?? {};
+    savedWfmDir         = parsed.wfm_direction        ?? '';
+    savedDrafts         = parsed.saved_drafts         ?? [];
+    savedRiMode         = parsed.ri_mode              ?? 'simple';
+    savedSimple         = parsed.simple               ?? {};
+    savedSelectedConn   = parsed.selected_connection  ?? '';
+    savedTemplates      = parsed.templates            ?? { ...DEFAULT_TEMPLATES };
+    wfmIncludePreset    = parsed.wfm_include_preset   ?? false;
+    wfmPresetId         = parsed.wfm_preset_id        ?? null;
+    savedRiPresets      = parsed.ri_presets           ?? [];
+    savedWfmDirPresets  = parsed.wfm_dir_presets      ?? [];
   } catch (_) {
     savedTemplates = { ...DEFAULT_TEMPLATES };
   }
@@ -66,18 +68,19 @@ async function loadState(userId) {
 async function persistState(userId) {
   try {
     await spindle.storage.write(`state_${userId ?? 'default'}.json`, JSON.stringify({
-      instruction:   activeInstruction,
-      enabled:       instructionEnabled,
-      presets:       savedPresets,
-      wfm_direction: savedWfmDir,
-      saved_drafts:  savedDrafts,
-      ri_mode:            savedRiMode,
-      simple:             savedSimple,
-      templates:          savedTemplates,
-      wfm_include_preset: wfmIncludePreset,
-      wfm_preset_id:      wfmPresetId,
-      ri_presets:         savedRiPresets,
-      wfm_dir_presets:    savedWfmDirPresets,
+      instruction:          activeInstruction,
+      enabled:              instructionEnabled,
+      presets:              savedPresets,
+      wfm_direction:        savedWfmDir,
+      saved_drafts:         savedDrafts,
+      ri_mode:              savedRiMode,
+      simple:               savedSimple,
+      selected_connection:  savedSelectedConn,
+      templates:            savedTemplates,
+      wfm_include_preset:   wfmIncludePreset,
+      wfm_preset_id:        wfmPresetId,
+      ri_presets:           savedRiPresets,
+      wfm_dir_presets:      savedWfmDirPresets,
     }));
   } catch (_) {}
 }
@@ -87,6 +90,9 @@ function renderTemplate(tpl, vars) {
     .replace(/\{\{user\}\}/g, vars.user || 'User')
     .replace(/\{\{char\}\}/g, vars.char || 'Companion')
     .replace(/\{\{context\}\}/g, vars.context || '(None)')
+    .replace(/\{\{lastMessage\}\}/g, vars.lastMessage || '(None)')
+    .replace(/\{\{lastUserMessage\}\}/g, vars.lastUserMessage || '(None)')
+    .replace(/\{\{lastCharMessage\}\}/g, vars.lastCharMessage || '(None)')
     .replace(/\{\{draft\}\}/g, vars.draft || '(None)')
     .replace(/\{\{direction\}\}/g, vars.direction || 'Continue the scene naturally.');
 }
@@ -98,43 +104,51 @@ spindle.onFrontendMessage(async (payload, userId) => {
   if (payload.type === 'ri:load') {
     await loadState(userId);
     let presetList = [];
+    let connections = [];
     try {
       const { data } = await spindle.presets.list({ limit: 50, userId });
       presetList = (data ?? []).map(p => ({ id: p.id, name: p.name }));
     } catch (_) {}
+    try {
+      connections = await spindle.connections.list(userId);
+    } catch (_) {}
+
     spindle.sendToFrontend({
       type: 'ri:state',
+      connections: connections.map(c => ({ id: c.id, name: c.name, provider: c.provider, model: c.model })),
       state: {
-        instruction:        activeInstruction,
-        enabled:            instructionEnabled,
-        presets:            savedPresets,
-        wfm_direction:      savedWfmDir,
-        saved_drafts:       savedDrafts,
-        ri_mode:            savedRiMode,
-        simple:             savedSimple,
-        templates:          savedTemplates,
-        wfm_include_preset: wfmIncludePreset,
-        wfm_preset_id:      wfmPresetId,
-        preset_list:        presetList,
-        ri_presets:         savedRiPresets,
-        wfm_dir_presets:    savedWfmDirPresets,
+        instruction:          activeInstruction,
+        enabled:              instructionEnabled,
+        presets:              savedPresets,
+        wfm_direction:        savedWfmDir,
+        saved_drafts:         savedDrafts,
+        ri_mode:              savedRiMode,
+        simple:               savedSimple,
+        selected_connection:  savedSelectedConn,
+        templates:            savedTemplates,
+        wfm_include_preset:   wfmIncludePreset,
+        wfm_preset_id:        wfmPresetId,
+        preset_list:          presetList,
+        ri_presets:           savedRiPresets,
+        wfm_dir_presets:      savedWfmDirPresets,
       },
     }, userId);
   }
 
   if (payload.type === 'ri:update') {
-    activeInstruction  = payload._active_instruction ?? payload.instruction ?? activeInstruction;
-    instructionEnabled = payload.enabled       ?? instructionEnabled;
-    savedPresets       = payload.presets       ?? savedPresets;
-    savedWfmDir        = payload.wfm_direction ?? savedWfmDir;
-    savedDrafts        = payload.saved_drafts  ?? savedDrafts;
-    savedRiMode        = payload.ri_mode       ?? savedRiMode;
-    savedSimple        = payload.simple        ?? savedSimple;
-    savedTemplates     = payload.templates          ?? savedTemplates;
-    wfmIncludePreset   = payload.wfm_include_preset ?? wfmIncludePreset;
-    wfmPresetId        = payload.wfm_preset_id      ?? wfmPresetId;
-    savedRiPresets     = payload.ri_presets         ?? savedRiPresets;
-    savedWfmDirPresets = payload.wfm_dir_presets    ?? savedWfmDirPresets;
+    activeInstruction   = payload._active_instruction ?? payload.instruction ?? activeInstruction;
+    instructionEnabled  = payload.enabled              ?? instructionEnabled;
+    savedPresets        = payload.presets              ?? savedPresets;
+    savedWfmDir         = payload.wfm_direction        ?? savedWfmDir;
+    savedDrafts         = payload.saved_drafts         ?? savedDrafts;
+    savedRiMode         = payload.ri_mode              ?? savedRiMode;
+    savedSimple         = payload.simple               ?? savedSimple;
+    savedSelectedConn   = payload.selected_connection  ?? savedSelectedConn;
+    savedTemplates      = payload.templates            ?? savedTemplates;
+    wfmIncludePreset    = payload.wfm_include_preset   ?? wfmIncludePreset;
+    wfmPresetId         = payload.wfm_preset_id        ?? wfmPresetId;
+    savedRiPresets      = payload.ri_presets           ?? savedRiPresets;
+    savedWfmDirPresets  = payload.wfm_dir_presets      ?? savedWfmDirPresets;
     await persistState(userId);
   }
 
@@ -143,23 +157,49 @@ spindle.onFrontendMessage(async (payload, userId) => {
     const userInput = payload.userInput?.trim() || '';
     const charName = payload.charName || 'the companion';
     const personaName = payload.personaName || 'the user';
-    const contextSnippet = payload.contextSnippet?.trim() || '';
+    let contextSnippet = payload.contextSnippet?.trim() || '';
+    let lastMsg = payload.lastMessage?.trim() || '';
+    let lastUserMsg = payload.lastUserMessage?.trim() || '';
+    let lastCharMsg = payload.lastCharMessage?.trim() || '';
+    const requestedConnId = payload.connectionId;
 
     try {
       const connections = await spindle.connections.list(userId);
-      const conn = connections?.find(c => c.is_default) ?? connections?.[0];
-      if (!conn) throw new Error('No connection profile found in Lumiverse settings.');
+      let targetConn = null;
+      if (requestedConnId) {
+        targetConn = connections?.find(c => c.id === requestedConnId);
+      }
+      if (!targetConn) {
+        targetConn = connections?.find(c => c.is_default) ?? connections?.[0];
+      }
+      if (!targetConn) throw new Error('No connection profile found in Lumiverse settings.');
 
-      const tpls = { ...DEFAULT_TEMPLATES, ...savedTemplates };
-      const vars = {
-        user: personaName,
-        char: charName,
-        context: contextSnippet,
-        draft: userInput,
-        direction: direction || 'Continue the scene naturally.'
-      };
+      // Pull raw database context to beat DOM scroll virtualization
+      try {
+        if (spindle.chats?.getActiveChat) {
+          const activeChat = await spindle.chats.getActiveChat(userId);
+          if (activeChat?.messages && activeChat.messages.length > 0) {
+            const rawMsgs = activeChat.messages.slice(-6);
+            contextSnippet = rawMsgs.map(m => {
+              const speaker = m.role === 'user' ? personaName : charName;
+              return `[${speaker}]:\n${m.content}`;
+            }).join('\n\n---\n\n');
 
-      // ─── Fetch preset blocks if enabled ──────────────────────────────────
+            const lastObj = activeChat.messages[activeChat.messages.length - 1];
+            if (lastObj) lastMsg = lastObj.content;
+
+            const userObjs = activeChat.messages.filter(m => m.role === 'user');
+            if (userObjs.length > 0) lastUserMsg = userObjs[userObjs.length - 1].content;
+
+            const charObjs = activeChat.messages.filter(m => m.role !== 'user');
+            if (charObjs.length > 0) lastCharMsg = charObjs[charObjs.length - 1].content;
+          }
+        }
+      } catch (dbErr) {
+        spindle.log.warn('Could not read raw chat db log, falling back to rich DOM text:', dbErr);
+      }
+
+      // Fetch preset blocks if enabled
       const presetMessages = [];
       if (wfmIncludePreset && wfmPresetId) {
         try {
@@ -178,11 +218,22 @@ spindle.onFrontendMessage(async (payload, userId) => {
         }
       }
 
+      const tpls = { ...DEFAULT_TEMPLATES, ...savedTemplates };
+      const vars = {
+        user: personaName,
+        char: charName,
+        context: contextSnippet || '(No recent dialogue found — maintain setting from direction)',
+        lastMessage: lastMsg || '(None)',
+        lastUserMessage: lastUserMsg || '(None)',
+        lastCharMessage: lastCharMsg || '(None)',
+        draft: userInput || '(None provided)',
+        direction: direction || 'Continue the scene naturally.'
+      };
+
       const systemMessage = renderTemplate(tpls.system_prompt, vars);
       const userPromptTemplate = userInput ? tpls.rewrite_prompt : tpls.scratch_prompt;
       const userMessage = renderTemplate(userPromptTemplate, vars);
 
-      // preset blocks → ghostwriter system prompt → user prompt
       const messages = [
         ...presetMessages,
         { role: 'system', content: systemMessage },
@@ -192,15 +243,14 @@ spindle.onFrontendMessage(async (payload, userId) => {
       const result = await spindle.generate.quiet({
         type: 'quiet',
         userId,
-        connection_id: conn.id,
+        connection_id: targetConn.id,
         messages,
-        parameters: { max_tokens: 600, temperature: 0.8 },
+        parameters: { max_tokens: 1000, temperature: 0.8 },
         reasoning: { source: 'off' },
       });
 
       let rawText = result?.content ?? '';
 
-      // Strip think tags & meta-chatter
       rawText = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
       rawText = rawText.replace(/^(The user wants me to|Here is the response|Certainly|Here's a draft)[^\n]*\n+/i, '').trim();
 
