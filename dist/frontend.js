@@ -47,6 +47,7 @@ CRITICAL RULES:
 export function setup(ctx) {
   let state = {
     instruction: '', enabled: false, presets: {}, wfm_direction: '', saved_drafts: [],
+    selected_connection: '',
     ri_mode: 'simple',
     simple: { own: '', length: '', style: '', speak_for: '', intimacy: '', pacing: '', narration: '' },
     templates: { ...DEFAULT_TEMPLATES },
@@ -56,6 +57,7 @@ export function setup(ctx) {
     ri_presets: [],
     wfm_dir_presets: [],
   };
+  let connectionsList = [];
   let panelOpen = false, activeTab = 'ri';
   let drafts = [], draftIdx = 0, generating = false;
   let wfmView = 'generate';
@@ -175,6 +177,13 @@ export function setup(ctx) {
     .ri-draft-box.ri-visible { display: block; }
 
     .ri-wfm-actions { display: flex; gap: 6px; align-items: center; }
+    .ri-select {
+      background: var(--lumiverse-fill-subtle); border: 1px solid var(--lumiverse-border);
+      border-radius: var(--lumiverse-radius); color: var(--lumiverse-text);
+      font-size: 11.5px; font-family: inherit; padding: 5px 7px; outline: none;
+      max-width: 140px; cursor: pointer;
+    }
+    .ri-select:focus { border-color: var(--lumiverse-accent); }
     .ri-btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 5px;
       padding: 5px 10px; border-radius: var(--lumiverse-radius);
@@ -265,9 +274,8 @@ export function setup(ctx) {
 
     .ri-help-text { font-size: 10.5px; color: var(--lumiverse-text-dim); line-height: 1.4; }
 
-    .ri-lib-view {
-      display: none; flex-direction: column; gap: 0;
-    }
+    /* Library views */
+    .ri-lib-view { display: none; flex-direction: column; gap: 0; }
     .ri-lib-view.ri-visible { display: flex; min-height: 200px; }
     .ri-lib-header {
       display: flex; align-items: center; gap: 5px;
@@ -320,12 +328,8 @@ export function setup(ctx) {
     .ri-lib-del:hover { color: #f87171; border-color: #f87171; }
     .ri-lib-empty { font-size: 11.5px; color: var(--lumiverse-text-dim); padding: 8px 4px; text-align: center; }
 
-    .ri-wfm-option {
-      display: flex; align-items: center; gap: 7px;
-    }
-    .ri-wfm-option-label {
-      font-size: 11.5px; color: var(--lumiverse-text-muted);
-    }
+    .ri-wfm-option { display: flex; align-items: center; gap: 7px; margin-top: 2px; }
+    .ri-wfm-option-label { font-size: 11.5px; color: var(--lumiverse-text-muted); }
     #ri-preset-select {
       width: 100%; box-sizing: border-box;
       background: var(--lumiverse-fill-subtle); border: 1px solid var(--lumiverse-border);
@@ -336,6 +340,49 @@ export function setup(ctx) {
     #ri-preset-select:focus { border-color: var(--lumiverse-accent); }
     #ri-preset-select:disabled { opacity: 0.4; cursor: default; }
     #ri-preset-picker { display: none; }
+
+    /* ─── Mobile Viewport Optimizations (max-width: 768px) ─── */
+    @media (max-width: 768px) {
+      #ri-toolbar { padding: 2px 6px; gap: 2px; }
+      .ri-icon-btn { width: 24px; height: 24px; }
+      .ri-icon-btn svg { width: 12px; height: 12px; }
+      #ri-panel.ri-open { max-height: 340px; }
+      
+      .ri-header { padding: 4px 8px; font-size: 9.5px; }
+      .ri-body { padding: 6px 8px; gap: 5px; max-height: 290px; }
+      
+      .ri-ta {
+        font-size: 11px !important;
+        padding: 4px 7px !important;
+      }
+      #ri-instr-ta { min-height: 52px; }
+      #ri-dir-ta   { min-height: 32px; }
+      
+      .ri-label { font-size: 9px; margin-bottom: 2px; }
+      .ri-preview { font-size: 10.5px; padding: 4px 7px; max-height: 46px; }
+      .ri-draft-box { font-size: 11px; padding: 5px 7px; max-height: 75px; }
+      
+      .ri-wfm-actions { gap: 4px; }
+      .ri-select {
+        font-size: 10px !important;
+        padding: 3px 5px !important;
+        max-width: 105px !important;
+      }
+      .ri-btn {
+        font-size: 10.5px !important;
+        padding: 4px 6px !important;
+      }
+      
+      .ri-chips .ri-chip {
+        font-size: 10px !important;
+        padding: 2px 7px !important;
+      }
+      .ri-simple-ta {
+        font-size: 10.5px !important;
+        min-height: 36px !important;
+        padding: 4px 6px !important;
+      }
+    }
   `);
 
   function getComposerInput() {
@@ -537,6 +584,9 @@ export function setup(ctx) {
             </select>
           </div>
           <div class="ri-wfm-actions">
+            <select class="ri-select" id="ri-conn-select" title="Select Model Connection">
+              <option value="">Default Connection</option>
+            </select>
             <button class="ri-btn ri-btn-gen" id="ri-gen">${IC.gen} Generate</button>
             <button class="ri-btn ri-btn-use" id="ri-use" disabled>${IC.use} Use this</button>
           </div>
@@ -558,7 +608,7 @@ export function setup(ctx) {
         </div>
         <div class="ri-body">
           <div class="ri-help-text">
-            Custom variables: <code>{{user}}</code>, <code>{{char}}</code>, <code>{{context}}</code>, <code>{{draft}}</code>, <code>{{direction}}</code>
+            Custom variables: <code>{{user}}</code>, <code>{{char}}</code>, <code>{{context}}</code>, <code>{{lastMessage}}</code>, <code>{{lastCharMessage}}</code>, <code>{{lastUserMessage}}</code>, <code>{{draft}}</code>, <code>{{direction}}</code>
           </div>
           <div class="ri-field">
             <div class="ri-field-label">System Directive</div>
@@ -625,7 +675,6 @@ export function setup(ctx) {
       const customBody = el.querySelector('#ri-custom-body');
       const modeTabs   = el.querySelector('#ri-mode-tabs');
       const libView    = el.querySelector('#ri-lib-view');
-      // show lib first, then hide bodies — prevents panel from collapsing mid-transition
       if (libView)    libView.classList.add('ri-visible');
       if (simpleBody) simpleBody.style.display = 'none';
       if (customBody) customBody.style.display = 'none';
@@ -635,11 +684,9 @@ export function setup(ctx) {
     function hideRiLib() {
       const libView = el.querySelector('#ri-lib-view');
       if (libView) libView.classList.remove('ri-visible');
-      // restore mode tabs and correct body
       const modeTabs = el.querySelector('#ri-mode-tabs');
       if (modeTabs) modeTabs.style.display = '';
       setRiMode(state.ri_mode, true);
-      // make sure panel stays open
       document.getElementById('ri-panel')?.classList.add('ri-open');
     }
     function renderRiLib() {
@@ -792,6 +839,12 @@ export function setup(ctx) {
       setTimeout(() => { btn.innerHTML = IC.save; }, 1200);
     };
 
+    const connSelect = el.querySelector('#ri-conn-select');
+    connSelect.onchange = () => {
+      state.selected_connection = connSelect.value;
+      push();
+    };
+
     // Template Wiring
     const tplSys = el.querySelector('#ri-tpl-system');
     const tplRew = el.querySelector('#ri-tpl-rewrite');
@@ -874,7 +927,21 @@ export function setup(ctx) {
     }
   }
 
-  // ─── Generate ────────────────────────────────────────────────────────────────
+  function populateConnectionsUI() {
+    const select = document.getElementById('ri-conn-select');
+    if (!select) return;
+    const currentVal = state.selected_connection;
+    select.innerHTML = '<option value="">Default Connection</option>';
+    connectionsList.forEach(conn => {
+      const opt = document.createElement('option');
+      opt.value = conn.id;
+      opt.textContent = `${conn.name || conn.provider || 'Connection'} (${conn.model || 'default'})`;
+      if (conn.id === currentVal) opt.selected = true;
+      select.appendChild(opt);
+    });
+  }
+
+  // ─── Generate (Deep Context Harvester) ───────────────────────────────────────
   function generate() {
     if (generating) return;
     generating = true;
@@ -892,14 +959,35 @@ export function setup(ctx) {
     const personaHeader = document.querySelector('[class*="personaName"], [class*="_persona_"], [data-component="PersonaSelector"], [aria-label*="persona" i]');
     const personaName = personaHeader?.innerText?.trim() || 'User';
 
-    const proseNodes = document.querySelectorAll('[class*="prose"], [class*="markdown"], [class*="messageContent"], [class*="bubble"]');
+    const messageCards = document.querySelectorAll('[data-component="MinimalMessage"], [class*="messageRow"], [data-part]');
     const snippets = [];
-    Array.from(proseNodes).slice(-4).forEach(node => {
-      const text = node.innerText?.trim();
-      if (text && text.length > 5 && !text.includes('Response Instructions')) {
-        snippets.push(text.slice(0, 500));
-      }
-    });
+    let lastMsg = '';
+    let lastUserMsg = '';
+    let lastCharMsg = '';
+
+    if (messageCards.length > 0) {
+      const slice = Array.from(messageCards).slice(-6);
+      slice.forEach(card => {
+        const isUser = card.getAttribute('data-part') === 'user' || card.querySelector('[data-part="user"]') || card.className.includes('user');
+        const speaker = isUser ? personaName : charName;
+
+        const contentEl = card.querySelector('[data-component="MessageContent"], [class*="_content_"], [class*="markdown"], [class*="prose"]');
+        const text = contentEl?.innerText?.trim();
+
+        if (text && text.length > 5 && !text.includes('Response Instructions')) {
+          // Allow up to 14,000 characters per message so long novel responses survive
+          const cleanText = text.slice(0, 14000);
+          snippets.push(`[${speaker}]:\n${cleanText}`);
+          
+          lastMsg = cleanText;
+          if (isUser) {
+            lastUserMsg = cleanText;
+          } else {
+            lastCharMsg = cleanText;
+          }
+        }
+      });
+    }
 
     ctx.sendToBackend({
       type: 'ri:generate',
@@ -907,7 +995,11 @@ export function setup(ctx) {
       userInput: currentInput,
       charName: charName,
       personaName: personaName,
-      contextSnippet: snippets.join('\n\n---\n\n')
+      connectionId: state.selected_connection || '',
+      contextSnippet: snippets.join('\n\n---\n\n'),
+      lastMessage: lastMsg,
+      lastUserMessage: lastUserMsg,
+      lastCharMessage: lastCharMsg
     });
   }
 
@@ -943,7 +1035,7 @@ export function setup(ctx) {
     document.getElementById('ri-tab-ri').style.display  = tab === 'ri'  ? 'block' : 'none';
     document.getElementById('ri-tab-wfm').style.display = tab === 'wfm' ? 'block' : 'none';
     document.getElementById('ri-tab-tpl').style.display = tab === 'tpl' ? 'block' : 'none';
-    if (tab === 'wfm') { updatePreview(); setWfmView(wfmView); }
+    if (tab === 'wfm') { updatePreview(); setWfmView(wfmView); populateConnectionsUI(); }
     refreshBtns();
   }
 
@@ -993,7 +1085,6 @@ export function setup(ctx) {
         opt.textContent = p.name;
         presetSelect.appendChild(opt);
       }
-      // restore saved selection, fallback to first preset if none saved
       presetSelect.value = state.wfm_preset_id || current || '';
       if (!presetSelect.value && state.preset_list.length) {
         presetSelect.value = state.preset_list[0].id;
@@ -1008,6 +1099,7 @@ export function setup(ctx) {
 
     setRiMode(state.ri_mode ?? 'simple', true);
     applySimpleToUI();
+    populateConnectionsUI();
     refreshRiBtn();
   }
 
@@ -1097,7 +1189,10 @@ export function setup(ctx) {
 
   const unsubMsg = ctx.onBackendMessage((payload) => {
     if (payload.type === 'ri:state') {
-      state = { saved_drafts: [], templates: { ...DEFAULT_TEMPLATES }, wfm_include_preset: false, wfm_preset_id: null, preset_list: [], ri_presets: [], wfm_dir_presets: [], ...state, ...payload.state };
+      state = { saved_drafts: [], selected_connection: '', templates: { ...DEFAULT_TEMPLATES }, wfm_include_preset: false, wfm_preset_id: null, preset_list: [], ri_presets: [], wfm_dir_presets: [], ...state, ...payload.state };
+      if (Array.isArray(payload.connections)) {
+        connectionsList = payload.connections;
+      }
       applyStateToUI();
       ctx.sendToBackend({ type: 'ri:update', ...state });
     }
