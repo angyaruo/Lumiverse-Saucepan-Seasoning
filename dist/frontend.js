@@ -1,4 +1,3 @@
-// Response Instructions + Write For Me — frontend
 
 const IC = {
   ri:     `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>`,
@@ -932,13 +931,18 @@ export function setup(ctx) {
     if (!select) return;
     const currentVal = state.selected_connection;
     select.innerHTML = '<option value="">Default Connection</option>';
-    connectionsList.forEach(conn => {
-      const opt = document.createElement('option');
-      opt.value = conn.id;
-      opt.textContent = `${conn.name || conn.provider || 'Connection'} (${conn.model || 'default'})`;
-      if (conn.id === currentVal) opt.selected = true;
-      select.appendChild(opt);
-    });
+
+    if (Array.isArray(connectionsList) && connectionsList.length > 0) {
+      connectionsList.forEach(conn => {
+        const opt = document.createElement('option');
+        opt.value = conn.id;
+        const displayName = conn.name || conn.provider || 'Profile';
+        const modelLabel = conn.model ? ` (${conn.model})` : '';
+        opt.textContent = `${displayName}${modelLabel}`;
+        if (conn.id === currentVal) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
   }
 
   // ─── Generate (Deep Context Harvester) ───────────────────────────────────────
@@ -975,7 +979,6 @@ export function setup(ctx) {
         const text = contentEl?.innerText?.trim();
 
         if (text && text.length > 5 && !text.includes('Response Instructions')) {
-          // Allow up to 14,000 characters per message so long novel responses survive
           const cleanText = text.slice(0, 14000);
           snippets.push(`[${speaker}]:\n${cleanText}`);
           
@@ -1194,6 +1197,7 @@ export function setup(ctx) {
         connectionsList = payload.connections;
       }
       applyStateToUI();
+      populateConnectionsUI();
       ctx.sendToBackend({ type: 'ri:update', ...state });
     }
     if (payload.type === 'ri:draft') {
