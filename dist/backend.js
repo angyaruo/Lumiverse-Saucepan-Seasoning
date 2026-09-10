@@ -1,4 +1,4 @@
-// Response Instructions + Write For Me — backend
+
 
 let activeInstruction = '';
 let instructionEnabled = false;
@@ -105,17 +105,33 @@ spindle.onFrontendMessage(async (payload, userId) => {
     await loadState(userId);
     let presetList = [];
     let connections = [];
+
     try {
-      const { data } = await spindle.presets.list({ limit: 50, userId });
-      presetList = (data ?? []).map(p => ({ id: p.id, name: p.name }));
-    } catch (_) {}
+      const res = await spindle.presets.list({ limit: 50, userId });
+      const rawPresets = Array.isArray(res) ? res : (res?.data ?? []);
+      presetList = rawPresets.map(p => ({ id: p.id, name: p.name }));
+    } catch (pErr) {
+      spindle.log.warn('Could not list presets:', pErr?.message);
+    }
+
     try {
-      connections = await spindle.connections.list(userId);
-    } catch (_) {}
+      if (spindle.connections?.list) {
+        const rawConns = await spindle.connections.list(userId);
+        const list = Array.isArray(rawConns) ? rawConns : (rawConns?.data ?? []);
+        connections = list.map(c => ({
+          id: c.id,
+          name: c.name || c.label || c.model || 'Connection',
+          provider: c.provider || '',
+          model: c.model || ''
+        }));
+      }
+    } catch (cErr) {
+      spindle.log.warn('Could not list connections:', cErr?.message);
+    }
 
     spindle.sendToFrontend({
       type: 'ri:state',
-      connections: connections.map(c => ({ id: c.id, name: c.name, provider: c.provider, model: c.model })),
+      connections,
       state: {
         instruction:          activeInstruction,
         enabled:              instructionEnabled,
@@ -164,13 +180,20 @@ spindle.onFrontendMessage(async (payload, userId) => {
     const requestedConnId = payload.connectionId;
 
     try {
-      const connections = await spindle.connections.list(userId);
+      let connections = [];
+      try {
+        if (spindle.connections?.list) {
+          const raw = await spindle.connections.list(userId);
+          connections = Array.isArray(raw) ? raw : (raw?.data ?? []);
+        }
+      } catch (_) {}
+
       let targetConn = null;
       if (requestedConnId) {
-        targetConn = connections?.find(c => c.id === requestedConnId);
+        targetConn = connections.find(c => c.id === requestedConnId);
       }
       if (!targetConn) {
-        targetConn = connections?.find(c => c.is_default) ?? connections?.[0];
+        targetConn = connections.find(c => c.is_default) ?? connections[0];
       }
       if (!targetConn) throw new Error('No connection profile found in Lumiverse settings.');
 
